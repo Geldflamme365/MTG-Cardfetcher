@@ -23,7 +23,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-family: 'Space Grotesk', 'Segö UI', sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at 10% -10%, rgba(90, 103, 122, 0.3), transparent 42%),
@@ -110,6 +110,10 @@ h3 {
   color: #d3dae7;
   font-weight: 600;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.nav-link:visited {
+  color: #d3dae7;
 }
 
 .nav-link:hover {
@@ -443,3 +447,4 @@ button:hover {
     grid-template-columns: 1fr 1fr;
   }
 }
+
