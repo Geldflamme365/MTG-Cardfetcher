@@ -1,62 +1,104 @@
-<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remasurium</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MTG Cardfetcher</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="container">
-        <header>
-            <a href="index.html"><img src="Icon.png" alt="Logo" width="25" height="25" style="float: left; vertical-align: middle;"></a> 
-            <h1>Willkommen beim MTG Remasurium</h1>
-        </header>
+  <main class="page">
+    <section class="card hero">
+      <h1>MTG Cardfetcher</h1>
+      <p class="muted">Scryfall-basierter Kartenfinder mit Oracle-Text, Versionshistorie und persistenter Collection.</p>
+    </section>
 
-        <nav>
-            <ul>
-                <li><a href="index.html">Startseite</a></li>
-                <li><a href="cardfetcher.html">Cardfetcher</a></li>
-            </ul>
-        </nav>
+    <nav class="top-nav card" aria-label="Cardfetcher Navigation">
+      <a class="nav-link" href="#/home">Home</a>
+      <a class="nav-link" href="#/suche">Suche</a>
+      <a class="nav-link" href="#/collection">Collection</a>
+    </nav>
 
-        <main>
-            <h2>Über diese Website</h2>
-            <p>
-                Das Remaurium ist eine Webseite, mit der du 
-                MTG-Karten durchsuchen und Informationen zu verschiedenen
-                Sets anzeigen kannst.
-            </p>
+    <section id="view-home" class="view card" aria-live="polite">
+      <h2>Was kann der Cardfetcher?</h2>
+      <div class="feature-grid">
+        <article class="subcard">
+          <h3>Kartensuche</h3>
+          <p class="muted">Suche direkt ueber die Scryfall API nach Kartenname, Typ oder anderen Query-Teilen.</p>
+        </article>
+        <article class="subcard">
+          <h3>Oracle Text</h3>
+          <p class="muted">Zeigt den offiziellen Oracle Text der gewaehlten Karte in einer lesbaren Detailansicht.</p>
+        </article>
+        <article class="subcard">
+          <h3>Vergangene Versionen</h3>
+          <p class="muted">Lade fruehere Prints einer Karte und springe direkt in eine bestimmte Version.</p>
+        </article>
+        <article class="subcard">
+          <h3>Collection</h3>
+          <p class="muted">Speichere Karten lokal im Browser (localStorage), öffne sie spaeter erneut oder entferne sie wieder.</p>
+        </article>
+      </div>
 
-            <h2>Verwendung der Scryfall API</h2>
-            <p>
-                Diese Seite verwendet die <a id="schwarzerLink" href="https://scryfall.com/docs/api" target="_blank">Scryfall API</a>, um Karteninformationen, Bilder und Set-Daten in Echtzeit bereitzustellen. Scryfall ist eine kostenlose und leistungsstarke Datenquelle für MTG-Inhalte und wird von der Community aktiv unterstützt.
-                Alle Kartennamen, Bilder und zugehörigen Inhalte sind Eigentum von Wizards of the Coast.
-            </p>
+      <section class="info-section" aria-label="Oracle und Scryfall Syntax">
+        <h3>Oracle Tags & Scryfall-Suche</h3>
+        <div class="info-grid">
+          <article class="info-card">
+            <h4>Oracle Tags (grob erklaert)</h4>
+            <p class="muted">Oracle-Texte sind die offiziellen, aktuellen Regeltexte einer Karte. Damit kannst du Karten auch dann korrekt verstehen, wenn aeltere Drucke andere Formulierungen haben.</p>
+            <p class="muted"><strong>Wichtig:</strong> Fuer Regeln gilt immer der Oracle-Text, nicht nur der aufgedruckte Text einer alten Version.</p>
+          </article>
 
-            <h2>Funktionen</h2>
-            <ul>
-                <li>Navigation durch die neuesten MTG-Sets</li>
-                <li>Set-spezifische Unterseiten mit Bild und Beschreibung</li>
-                <li>Integration der Scryfall API zur Kartensuche (geplant/optional)</li>
-                <li>Mobilfreundliches, responsives Design</li>
-            </ul>
-        </main>
+          <article class="info-card">
+            <h4>Scryfall Syntax Suche</h4>
+            <p class="muted">Mit Scryfall-Querys filterst du sehr gezielt nach Farbe, Typ, Kosten oder Oracle-Inhalten.</p>
+            <div class="syntax-list">
+              <code>c:u t:creature</code>
+              <code>mv&lt;=3 t:instant</code>
+              <code>o:\"draw a card\"</code>
+            </div>
+          </article>
+        </div>
+      </section>
+    </section>
 
-        <aside>
-            <h2>Hinweis</h2>
-            <p>
-                Diese Seite ist ein nicht-kommerzielles 
-                Fanprojekt und steht in keiner offiziellen 
-                Verbindung zu Wizards of the Coast oder Scryfall.
-            </p>
-        </aside>
+    <section id="view-suche" class="view" aria-live="polite">
+      <article class="card">
+        <h2>Suche</h2>
+        <div class="search-row">
+          <input id="searchInput" type="text" placeholder="z.B. lightning bolt" autocomplete="off" />
+          <button id="searchBtn" type="button">Suchen</button>
+        </div>
+      </article>
 
-        <footer>
-            <p>2025 MTG Cardfetcher - Karten-API von <a href="https://scryfall.com" target="_blank">Scryfall</a></p>
-            <img src="scryfall.png" alt="Scryfall Logo" height="50" width="50" title="Scryfall Logo"><br>
-            <b>Ersteller Website: Tim Ackeret</b>
-        </footer>
-    </div>
+      <div class="split-layout">
+        <article class="card">
+          <h2>Treffer</h2>
+          <div id="results" class="results"></div>
+        </article>
+
+        <article class="card">
+          <h2>Kartendetails</h2>
+          <div id="searchDetails" class="muted">Noch keine Karte ausgewaehlt.</div>
+        </article>
+      </div>
+    </section>
+
+    <section id="view-collection" class="view" aria-live="polite">
+      <div class="split-layout">
+        <article class="card">
+          <h2>Meine Collection</h2>
+          <div id="collection" class="collection-list"></div>
+        </article>
+
+        <article class="card">
+          <h2>Collection-Karte</h2>
+          <div id="collectionDetails" class="muted">Noch keine Karte aus der Collection geöffnet.</div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
