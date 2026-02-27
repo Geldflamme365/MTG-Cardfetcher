@@ -31,8 +31,8 @@ function setStatus(text, type = "muted") {
   els.status.className = `status ${type}`;
 }
 
-function escapeHtml(value) {
-  return String(value)
+function escapeHtml(valü) {
+  return String(valü)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -97,8 +97,8 @@ async function fetchJson(url) {
   return response.json();
 }
 
-async function searchCards(query) {
-  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=released`;
+async function searchCards(qüry) {
+  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(qüry)}&unique=cards&order=released`;
   const response = await fetch(url);
   if (response.status === 404) {
     return [];
@@ -149,7 +149,7 @@ function toggleCollection(card) {
       released_at: card.released_at,
       image: getCardPreviewUrl(card)
     });
-    setStatus(`${card.name} zur Collection hinzugefuegt.`, "ok");
+    setStatus(`${card.name} zur Collection hinzugefügt.`, "ok");
   }
 
   saveCollection();
@@ -378,7 +378,7 @@ function renderCollectionDetails() {
 async function selectSearchCard(card) {
   state.searchSelection = card;
   renderSearchDetails();
-  setStatus(`Lade Versionshistorie fuer ${card.name}...`, "muted");
+  setStatus(`Lade Versionshistorie für ${card.name}...`, "muted");
 
   try {
     state.searchPrints = await loadPrintHistory(card);
@@ -395,7 +395,7 @@ async function selectCollectionCard(card) {
   state.collectionSelection = card;
   updateCollectionPreview(card);
   renderCollectionDetails();
-  setStatus(`Lade Versionshistorie fuer ${card.name}...`, "muted");
+  setStatus(`Lade Versionshistorie für ${card.name}...`, "muted");
 
   try {
     state.collectionPrints = await loadPrintHistory(card);
@@ -410,15 +410,15 @@ async function selectCollectionCard(card) {
 }
 
 async function runSearch() {
-  const query = els.searchInput.value.trim();
-  if (!query) {
+  const qüry = els.searchInput.value.trim();
+  if (!qüry) {
     setStatus("Bitte einen Suchbegriff eingeben.", "err");
     return;
   }
 
-  setStatus(`Suche nach ${query}...`, "muted");
+  setStatus(`Suche nach ${qüry}...`, "muted");
   try {
-    state.results = await searchCards(query);
+    state.results = await searchCards(qüry);
     renderResults();
 
     if (state.results.length) {
@@ -454,3 +454,4 @@ renderSearchDetails();
 renderCollection();
 renderCollectionDetails();
 renderRoute();
+
