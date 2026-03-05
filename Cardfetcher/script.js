@@ -13,6 +13,8 @@ const els = {
   searchBtn: document.getElementById("searchBtn"),
   results: document.getElementById("results"),
   searchDetails: document.getElementById("searchDetails"),
+  searchModal: document.getElementById("searchModal"),
+  modalCloseBtn: document.getElementById("modalCloseBtn"),
   collection: document.getElementById("collection"),
   collectionDetails: document.getElementById("collectionDetails"),
   views: {
@@ -84,9 +86,22 @@ function renderRoute() {
 
   document.title = titleMap[route] || "MTG Cardfetcher";
   setActiveNav(route);
+  closeSearchModal();
   if (route === "collection") {
     void ensureCollectionSelection();
   }
+}
+
+function openSearchModal() {
+  if (!els.searchModal) return;
+  els.searchModal.classList.add("open");
+  els.searchModal.setAttribute("aria-hidden", "false");
+}
+
+function closeSearchModal() {
+  if (!els.searchModal) return;
+  els.searchModal.classList.remove("open");
+  els.searchModal.setAttribute("aria-hidden", "true");
 }
 
 async function fetchJson(url) {
@@ -123,10 +138,12 @@ function isInCollection(id) {
 }
 
 function getCardPreviewUrl(card) {
-  return card.image_uris?.small
-    || card.image_uris?.normal
-    || card.card_faces?.[0]?.image_uris?.small
+  return card.image_uris?.normal
+    || card.image_uris?.large
+    || card.image_uris?.small
     || card.card_faces?.[0]?.image_uris?.normal
+    || card.card_faces?.[0]?.image_uris?.large
+    || card.card_faces?.[0]?.image_uris?.small
     || "";
 }
 
@@ -164,18 +181,26 @@ function renderResults() {
     return;
   }
 
-  els.results.innerHTML = state.results.map((card) => {
-    const subtitle = `${card.set_name || "Unbekanntes Set"} - ${card.released_at || "?"}`;
-    return `
-      <div class="result-item">
-        <div>
-          <strong>${escapeHtml(card.name)}</strong><br />
-          <small>${escapeHtml(subtitle)}</small>
-        </div>
-        <button type="button" data-select="${card.id}">Anzeigen</button>
-      </div>
-    `;
-  }).join("");
+  els.results.innerHTML = `
+    <div class="search-grid">
+      ${state.results.map((card) => {
+        const preview = getCardPreviewUrl(card);
+        return `
+          <button
+            type="button"
+            class="search-tile${state.searchSelection?.id === card.id ? " active" : ""}"
+            data-select="${card.id}"
+            title="${escapeHtml(card.name)}"
+          >
+            ${preview
+              ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+              : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
+            }
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
 
   for (const btn of els.results.querySelectorAll("button[data-select]")) {
     btn.addEventListener("click", () => {
@@ -377,7 +402,9 @@ function renderCollectionDetails() {
 
 async function selectSearchCard(card) {
   state.searchSelection = card;
+  renderResults();
   renderSearchDetails();
+  openSearchModal();
   setStatus(`Lade Versionshistorie für ${card.name}...`, "muted");
 
   try {
@@ -422,7 +449,6 @@ async function runSearch() {
     renderResults();
 
     if (state.results.length) {
-      await selectSearchCard(state.results[0]);
       setStatus(`${state.results.length} Treffer gefunden.`, "ok");
     } else {
       state.searchSelection = null;
@@ -448,6 +474,23 @@ els.searchInput.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("hashchange", renderRoute);
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeSearchModal();
+  }
+});
+
+if (els.modalCloseBtn) {
+  els.modalCloseBtn.addEventListener("click", closeSearchModal);
+}
+
+if (els.searchModal) {
+  els.searchModal.addEventListener("click", (event) => {
+    if (event.target === els.searchModal) {
+      closeSearchModal();
+    }
+  });
+}
 
 renderResults();
 renderSearchDetails();
