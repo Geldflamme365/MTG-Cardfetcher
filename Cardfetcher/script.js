@@ -2,8 +2,10 @@
   results: [],
   searchSelection: null,
   searchPrints: [],
+  searchFaceIndex: 0,
   collectionSelection: null,
   collectionPrints: [],
+  collectionFaceIndex: 0,
   collection: loadCollection()
 };
 
@@ -15,6 +17,8 @@ const els = {
   searchDetails: document.getElementById("searchDetails"),
   searchModal: document.getElementById("searchModal"),
   modalCloseBtn: document.getElementById("modalCloseBtn"),
+  collectionModal: document.getElementById("collectionModal"),
+  collectionModalCloseBtn: document.getElementById("collectionModalCloseBtn"),
   collection: document.getElementById("collection"),
   collectionDetails: document.getElementById("collectionDetails"),
   views: {
@@ -87,9 +91,7 @@ function renderRoute() {
   document.title = titleMap[route] || "MTG Cardfetcher";
   setActiveNav(route);
   closeSearchModal();
-  if (route === "collection") {
-    void ensureCollectionSelection();
-  }
+  closeCollectionModal();
 }
 
 function openSearchModal() {
@@ -102,6 +104,18 @@ function closeSearchModal() {
   if (!els.searchModal) return;
   els.searchModal.classList.remove("open");
   els.searchModal.setAttribute("aria-hidden", "true");
+}
+
+function openCollectionModal() {
+  if (!els.collectionModal) return;
+  els.collectionModal.classList.add("open");
+  els.collectionModal.setAttribute("aria-hidden", "false");
+}
+
+function closeCollectionModal() {
+  if (!els.collectionModal) return;
+  els.collectionModal.classList.remove("open");
+  els.collectionModal.setAttribute("aria-hidden", "true");
 }
 
 async function fetchJson(url) {
@@ -157,6 +171,7 @@ function toggleCollection(card) {
     if (state.collectionSelection?.id === card.id) {
       state.collectionSelection = null;
       state.collectionPrints = [];
+      closeCollectionModal();
     }
   } else {
     state.collection.unshift({
@@ -248,31 +263,6 @@ function renderCollection() {
       }
     });
   }
-
-  void ensureCollectionSelection();
-}
-
-async function ensureCollectionSelection() {
-  if (!state.collection.length) {
-    if (state.collectionSelection) {
-      state.collectionSelection = null;
-      state.collectionPrints = [];
-      renderCollectionDetails();
-    }
-    return;
-  }
-
-  if (state.collectionSelection?.id && isInCollection(state.collectionSelection.id)) {
-    return;
-  }
-
-  try {
-    const first = state.collection[0];
-    const card = await fetchJson(`https://api.scryfall.com/cards/${first.id}`);
-    await selectCollectionCard(card);
-  } catch (error) {
-    setStatus(`Collection-Karte konnte nicht geladen werden: ${error.message}`, "err");
-  }
 }
 
 function updateCollectionPreview(card) {
@@ -321,15 +311,24 @@ function createDetailsHtml(card, prints, context) {
       : `<p class="muted">Noch keine Karte aus der Collection geöffnet.</p>`;
   }
 
-  const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || "";
-  const oracleText = card.oracle_text
-    || card.card_faces?.map((face) => face.oracle_text || "").filter(Boolean).join("\n\n")
+  const activeFaceIndex = context === "search" ? state.searchFaceIndex : state.collectionFaceIndex;
+  const hasFaces = Array.isArray(card.card_faces) && card.card_faces.length > 1;
+  const safeFaceIndex = hasFaces ? Math.max(0, Math.min(activeFaceIndex, card.card_faces.length - 1)) : 0;
+  const face = hasFaces ? card.card_faces[safeFaceIndex] : null;
+  const img = face?.image_uris?.normal || card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || "";
+  const oracleText = face?.oracle_text
+    || card.oracle_text
+    || card.card_faces?.map((f) => f.oracle_text || "").filter(Boolean).join("\n\n")
     || "Kein Oracle Text vorhanden.";
+  const cardName = face?.name || card.name;
+  const typeLine = face?.type_line || card.type_line || "Unbekannter Typ";
+  const canFlip = hasFaces && card.card_faces.every((f) => Boolean(f.image_uris?.normal || f.image_uris?.large || f.image_uris?.small));
 
   return `
     <div class="details-grid">
-      <div>
-        ${img ? `<img class="preview" src="${escapeHtml(img)}" alt="${escapeHtml(card.name)}" />` : `<p class="muted">Kein Bild vorhanden.</p>`}
+      <div class="preview-wrap">
+        ${img ? `<img class="preview" src="${escapeHtml(img)}" alt="${escapeHtml(cardName)}" />` : `<p class="muted">Kein Bild vorhanden.</p>`}
+        ${canFlip ? `<button type="button" class="flip-btn" data-flip-face="1" data-context="${context}" aria-label="Kartenseite wechseln" title="Kartenseite wechseln">↻</button>` : ""}
         <div class="details-actions">
           <button type="button" data-toggle-collection="${card.id}">
             ${isInCollection(card.id) ? "Aus Collection entfernen" : "In Collection speichern"}
@@ -338,8 +337,8 @@ function createDetailsHtml(card, prints, context) {
       </div>
       <div class="meta">
         <div>
-          <h3>${escapeHtml(card.name)}</h3>
-          <p class="muted">${escapeHtml(card.type_line || "Unbekannter Typ")}</p>
+          <h3>${escapeHtml(cardName)}</h3>
+          <p class="muted">${escapeHtml(typeLine)}</p>
           <div class="pill-row details-pills">
             <span class="pill">Set: ${escapeHtml(card.set_name || "?")}</span>
             <span class="pill">Release: ${escapeHtml(card.released_at || "?")}</span>
@@ -388,6 +387,25 @@ function bindDetailsEvents(container, context) {
       }
     });
   }
+
+  const flipBtn = container.querySelector("button[data-flip-face]");
+  if (flipBtn) {
+    flipBtn.addEventListener("click", () => {
+      if (context === "search") {
+        const faces = state.searchSelection?.card_faces || [];
+        if (faces.length > 1) {
+          state.searchFaceIndex = state.searchFaceIndex === 0 ? 1 : 0;
+          renderSearchDetails();
+        }
+      } else {
+        const faces = state.collectionSelection?.card_faces || [];
+        if (faces.length > 1) {
+          state.collectionFaceIndex = state.collectionFaceIndex === 0 ? 1 : 0;
+          renderCollectionDetails();
+        }
+      }
+    });
+  }
 }
 
 function renderSearchDetails() {
@@ -402,6 +420,7 @@ function renderCollectionDetails() {
 
 async function selectSearchCard(card) {
   state.searchSelection = card;
+  state.searchFaceIndex = 0;
   renderResults();
   renderSearchDetails();
   openSearchModal();
@@ -420,13 +439,15 @@ async function selectSearchCard(card) {
 
 async function selectCollectionCard(card) {
   state.collectionSelection = card;
+  state.collectionFaceIndex = 0;
   updateCollectionPreview(card);
+  renderCollection();
   renderCollectionDetails();
+  openCollectionModal();
   setStatus(`Lade Versionshistorie für ${card.name}...`, "muted");
 
   try {
     state.collectionPrints = await loadPrintHistory(card);
-    renderCollection();
     renderCollectionDetails();
     setStatus(`Collection-Karte geladen: ${card.name}`, "ok");
   } catch (error) {
@@ -477,6 +498,7 @@ window.addEventListener("hashchange", renderRoute);
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeSearchModal();
+    closeCollectionModal();
   }
 });
 
@@ -488,6 +510,18 @@ if (els.searchModal) {
   els.searchModal.addEventListener("click", (event) => {
     if (event.target === els.searchModal) {
       closeSearchModal();
+    }
+  });
+}
+
+if (els.collectionModalCloseBtn) {
+  els.collectionModalCloseBtn.addEventListener("click", closeCollectionModal);
+}
+
+if (els.collectionModal) {
+  els.collectionModal.addEventListener("click", (event) => {
+    if (event.target === els.collectionModal) {
+      closeCollectionModal();
     }
   });
 }
