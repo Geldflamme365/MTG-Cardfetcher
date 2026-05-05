@@ -1,4 +1,4 @@
-﻿const state = {
+const state = {
   results: [],
   searchSelection: null,
   searchPrints: [],
@@ -11,6 +11,8 @@
 
 const els = {
   status: document.getElementById("status"),
+  routeAddress: document.getElementById("routeAddress"),
+  routeFooter: document.getElementById("routeFooter"),
   searchInput: document.getElementById("searchInput"),
   searchBtn: document.getElementById("searchBtn"),
   results: document.getElementById("results"),
@@ -21,6 +23,10 @@ const els = {
   collectionModalCloseBtn: document.getElementById("collectionModalCloseBtn"),
   collection: document.getElementById("collection"),
   collectionDetails: document.getElementById("collectionDetails"),
+  resultCountOutputs: document.querySelectorAll("[data-results-count]"),
+  collectionCountOutputs: document.querySelectorAll("[data-collection-count]"),
+  queryButtons: document.querySelectorAll("[data-query]"),
+  randomButtons: document.querySelectorAll("[data-random-card]"),
   views: {
     home: document.getElementById("view-home"),
     suche: document.getElementById("view-suche"),
@@ -33,12 +39,13 @@ function setStatus(text, type = "muted") {
   if (!els.status) {
     return;
   }
+
   els.status.textContent = text;
   els.status.className = `status ${type}`;
 }
 
-function escapeHtml(valü) {
-  return String(valü)
+function escapeHtml(value) {
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -48,21 +55,27 @@ function escapeHtml(valü) {
 
 function loadCollection() {
   try {
-    return JSON.parse(localStorage.getItem("cardfetcher.collection") || "[]");
+    return JSON.parse(localStorage.getItem("remasurium.collection") || "[]");
   } catch {
     return [];
   }
 }
 
 function saveCollection() {
-  localStorage.setItem("cardfetcher.collection", JSON.stringify(state.collection));
+  localStorage.setItem("remasurium.collection", JSON.stringify(state.collection));
 }
 
 function normalizeRoute(hash) {
   const route = hash.replace(/^#\/?/, "").trim().toLowerCase();
-  if (!route) return "home";
-  if (route === "suche") return "suche";
-  if (route === "collection") return "collection";
+  if (!route) {
+    return "home";
+  }
+  if (route === "suche") {
+    return "suche";
+  }
+  if (route === "collection") {
+    return "collection";
+  }
   return "home";
 }
 
@@ -75,6 +88,22 @@ function setActiveNav(route) {
   }
 }
 
+function updateRouteChrome(route) {
+  const labels = {
+    home: "scry://remasurium/home",
+    suche: "scry://remasurium/search",
+    collection: "scry://remasurium/collection"
+  };
+  const label = labels[route] || labels.home;
+
+  if (els.routeAddress) {
+    els.routeAddress.textContent = label;
+  }
+  if (els.routeFooter) {
+    els.routeFooter.textContent = label;
+  }
+}
+
 function renderRoute() {
   const route = normalizeRoute(window.location.hash);
 
@@ -83,51 +112,76 @@ function renderRoute() {
   });
 
   const titleMap = {
-    home: "MTG Cardfetcher - Home",
-    suche: "MTG Cardfetcher - Suche",
-    collection: "MTG Cardfetcher - Collection"
+    home: "MTG Remasurium - Home",
+    suche: "MTG Remasurium - Suche",
+    collection: "MTG Remasurium - Collection"
   };
 
-  document.title = titleMap[route] || "MTG Cardfetcher";
+  document.title = titleMap[route] || "MTG Remasurium";
   setActiveNav(route);
+  updateRouteChrome(route);
   closeSearchModal();
   closeCollectionModal();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function openSearchRoute() {
+  if (normalizeRoute(window.location.hash) !== "suche") {
+    window.location.hash = "#/suche";
+  } else {
+    renderRoute();
+  }
 }
 
 function openSearchModal() {
-  if (!els.searchModal) return;
+  if (!els.searchModal) {
+    return;
+  }
   els.searchModal.classList.add("open");
   els.searchModal.setAttribute("aria-hidden", "false");
 }
 
 function closeSearchModal() {
-  if (!els.searchModal) return;
+  if (!els.searchModal) {
+    return;
+  }
   els.searchModal.classList.remove("open");
   els.searchModal.setAttribute("aria-hidden", "true");
 }
 
 function openCollectionModal() {
-  if (!els.collectionModal) return;
+  if (!els.collectionModal) {
+    return;
+  }
   els.collectionModal.classList.add("open");
   els.collectionModal.setAttribute("aria-hidden", "false");
 }
 
 function closeCollectionModal() {
-  if (!els.collectionModal) return;
+  if (!els.collectionModal) {
+    return;
+  }
   els.collectionModal.classList.remove("open");
   els.collectionModal.setAttribute("aria-hidden", "true");
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
   return response.json();
 }
 
-async function searchCards(qüry) {
-  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(qüry)}&unique=cards&order=released`;
+async function fetchRandomCard() {
+  const nonce = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return fetchJson(`https://api.scryfall.com/cards/random?__cb=${encodeURIComponent(nonce)}`, {
+    cache: "no-store"
+  });
+}
+
+async function searchCards(query) {
+  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=released`;
   const response = await fetch(url);
   if (response.status === 404) {
     return [];
@@ -137,6 +191,39 @@ async function searchCards(qüry) {
   }
   const data = await response.json();
   return data.data || [];
+}
+
+function hasAdvancedScryfallSyntax(query) {
+  return /[:<>=!()"]/u.test(query);
+}
+
+async function searchCardsWithTolerance(query) {
+  const directResults = await searchCards(query);
+  if (directResults.length) {
+    return { cards: directResults, mode: "direct" };
+  }
+
+  if (hasAdvancedScryfallSyntax(query)) {
+    return { cards: [], mode: "none" };
+  }
+
+  try {
+    const fuzzyCard = await fetchJson(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(query)}`);
+    return { cards: [fuzzyCard], mode: "fuzzy", correctedName: fuzzyCard.name };
+  } catch {
+    try {
+      const auto = await fetchJson(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(query)}`);
+      const suggestion = auto?.data?.[0];
+      if (!suggestion) {
+        return { cards: [], mode: "none" };
+      }
+
+      const exactCard = await fetchJson(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(suggestion)}`);
+      return { cards: [exactCard], mode: "autocomplete", correctedName: exactCard.name };
+    } catch {
+      return { cards: [], mode: "none" };
+    }
+  }
 }
 
 async function loadPrintHistory(card) {
@@ -152,17 +239,35 @@ function isInCollection(id) {
 }
 
 function getCardPreviewUrl(card) {
-  return card.image_uris?.normal
-    || card.image_uris?.large
-    || card.image_uris?.small
-    || card.card_faces?.[0]?.image_uris?.normal
-    || card.card_faces?.[0]?.image_uris?.large
-    || card.card_faces?.[0]?.image_uris?.small
-    || "";
+  return (
+    card.image_uris?.normal ||
+    card.image_uris?.large ||
+    card.image_uris?.small ||
+    card.card_faces?.[0]?.image_uris?.normal ||
+    card.card_faces?.[0]?.image_uris?.large ||
+    card.card_faces?.[0]?.image_uris?.small ||
+    ""
+  );
+}
+
+function updateResultCount() {
+  const text = `${state.results.length} ${state.results.length === 1 ? "card" : "cards"}`;
+  els.resultCountOutputs.forEach((node) => {
+    node.textContent = text;
+  });
+}
+
+function updateCollectionCount() {
+  const text = `${state.collection.length}`;
+  els.collectionCountOutputs.forEach((node) => {
+    node.textContent = text;
+  });
 }
 
 function toggleCollection(card) {
-  if (!card) return;
+  if (!card) {
+    return;
+  }
 
   if (isInCollection(card.id)) {
     state.collection = state.collection.filter((item) => item.id !== card.id);
@@ -191,29 +296,37 @@ function toggleCollection(card) {
 }
 
 function renderResults() {
+  updateResultCount();
+
   if (!state.results.length) {
-    els.results.innerHTML = `<p class="muted">Keine Treffer.</p>`;
+    els.results.innerHTML = `<div class="empty-state">Noch keine Treffer. Starte eine Suche oder nutze ein Beispiel.</div>`;
     return;
   }
 
   els.results.innerHTML = `
     <div class="search-grid">
-      ${state.results.map((card) => {
-        const preview = getCardPreviewUrl(card);
-        return `
-          <button
-            type="button"
-            class="search-tile${state.searchSelection?.id === card.id ? " active" : ""}"
-            data-select="${card.id}"
-            title="${escapeHtml(card.name)}"
-          >
-            ${preview
-              ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
-              : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
-            }
-          </button>
-        `;
-      }).join("")}
+      ${state.results
+        .map((card) => {
+          const preview = getCardPreviewUrl(card);
+          return `
+            <button
+              type="button"
+              class="search-tile${state.searchSelection?.id === card.id ? " active" : ""}"
+              data-select="${card.id}"
+              title="${escapeHtml(card.name)}"
+            >
+              <span class="tile-frame">
+                ${
+                  preview
+                    ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+                    : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
+                }
+              </span>
+              <span class="tile-caption">${escapeHtml(card.name)}</span>
+            </button>
+          `;
+        })
+        .join("")}
     </div>
   `;
 
@@ -228,26 +341,36 @@ function renderResults() {
 }
 
 function renderCollection() {
+  updateCollectionCount();
+
   if (!state.collection.length) {
-    els.collection.innerHTML = `<p class="muted">Noch keine Karten gespeichert.</p>`;
+    els.collection.innerHTML = `<div class="empty-state">Noch keine Karten gespeichert.</div>`;
     return;
   }
 
   els.collection.innerHTML = `
     <div class="collection-grid">
-      ${state.collection.map((card) => `
-        <button
-          type="button"
-          class="collection-tile${state.collectionSelection?.id === card.id ? " active" : ""}"
-          data-pick="${card.id}"
-          title="${escapeHtml(card.name)}"
-        >
-          ${card.image
-            ? `<img src="${escapeHtml(card.image)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
-            : `<span class="collection-fallback">${escapeHtml(card.name)}</span>`
-          }
-        </button>
-      `).join("")}
+      ${state.collection
+        .map(
+          (card) => `
+            <button
+              type="button"
+              class="collection-tile${state.collectionSelection?.id === card.id ? " active" : ""}"
+              data-pick="${card.id}"
+              title="${escapeHtml(card.name)}"
+            >
+              <span class="tile-frame">
+                ${
+                  card.image
+                    ? `<img src="${escapeHtml(card.image)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+                    : `<span class="collection-fallback">${escapeHtml(card.name)}</span>`
+                }
+              </span>
+              <span class="tile-caption">${escapeHtml(card.name)}</span>
+            </button>
+          `
+        )
+        .join("")}
     </div>
   `;
 
@@ -267,7 +390,9 @@ function renderCollection() {
 
 function updateCollectionPreview(card) {
   const image = getCardPreviewUrl(card);
-  if (!image) return;
+  if (!image) {
+    return;
+  }
 
   let changed = false;
   state.collection = state.collection.map((item) => {
@@ -286,20 +411,24 @@ function updateCollectionPreview(card) {
 
 function renderVersionList(prints, context) {
   if (!prints.length) {
-    return `<p class="muted">Keine Versionsdaten vorhanden.</p>`;
+    return `<p class="small-note">Keine Versionsdaten vorhanden.</p>`;
   }
 
   return `
     <div class="versions">
-      ${prints.map((print) => `
-        <div class="entry">
-          <div>
-            <strong>${escapeHtml(print.set_name || "Unbekanntes Set")}</strong><br />
-            <small class="muted">${escapeHtml(print.collector_number || "?")} - ${escapeHtml(print.released_at || "?")}</small>
-          </div>
-          <button type="button" data-print="${print.id}" data-context="${context}">Öffnen</button>
-        </div>
-      `).join("")}
+      ${prints
+        .map(
+          (print) => `
+            <div class="entry">
+              <div>
+                <strong>${escapeHtml(print.set_name || "Unbekanntes Set")}</strong><br />
+                <small>${escapeHtml(print.collector_number || "?")} - ${escapeHtml(print.released_at || "?")}</small>
+              </div>
+              <button type="button" data-print="${print.id}" data-context="${context}">Öffnen</button>
+            </div>
+          `
+        )
+        .join("")}
     </div>
   `;
 }
@@ -307,8 +436,8 @@ function renderVersionList(prints, context) {
 function createDetailsHtml(card, prints, context) {
   if (!card) {
     return context === "search"
-      ? `<p class="muted">Noch keine Karte ausgewählt.</p>`
-      : `<p class="muted">Noch keine Karte aus der Collection geöffnet.</p>`;
+      ? `<p class="small-note">Noch keine Karte ausgewählt.</p>`
+      : `<p class="small-note">Noch keine Karte aus der Collection geöffnet.</p>`;
   }
 
   const activeFaceIndex = context === "search" ? state.searchFaceIndex : state.collectionFaceIndex;
@@ -316,29 +445,37 @@ function createDetailsHtml(card, prints, context) {
   const safeFaceIndex = hasFaces ? Math.max(0, Math.min(activeFaceIndex, card.card_faces.length - 1)) : 0;
   const face = hasFaces ? card.card_faces[safeFaceIndex] : null;
   const img = face?.image_uris?.normal || card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || "";
-  const oracleText = face?.oracle_text
-    || card.oracle_text
-    || card.card_faces?.map((f) => f.oracle_text || "").filter(Boolean).join("\n\n")
-    || "Kein Oracle Text vorhanden.";
+  const oracleText =
+    face?.oracle_text ||
+    card.oracle_text ||
+    card.card_faces?.map((entry) => entry.oracle_text || "").filter(Boolean).join("\n\n") ||
+    "Kein Oracle Text vorhanden.";
   const cardName = face?.name || card.name;
   const typeLine = face?.type_line || card.type_line || "Unbekannter Typ";
-  const canFlip = hasFaces && card.card_faces.every((f) => Boolean(f.image_uris?.normal || f.image_uris?.large || f.image_uris?.small));
+  const canFlip =
+    hasFaces &&
+    card.card_faces.every((entry) => Boolean(entry.image_uris?.normal || entry.image_uris?.large || entry.image_uris?.small));
 
   return `
     <div class="details-grid">
       <div class="preview-wrap">
-        ${img ? `<img class="preview" src="${escapeHtml(img)}" alt="${escapeHtml(cardName)}" />` : `<p class="muted">Kein Bild vorhanden.</p>`}
-        ${canFlip ? `<button type="button" class="flip-btn" data-flip-face="1" data-context="${context}" aria-label="Kartenseite wechseln" title="Kartenseite wechseln">↻</button>` : ""}
+        ${img ? `<img class="preview" src="${escapeHtml(img)}" alt="${escapeHtml(cardName)}" />` : `<p class="small-note">Kein Bild vorhanden.</p>`}
+        ${
+          canFlip
+            ? `<button type="button" class="flip-btn" data-flip-face="1" data-context="${context}" aria-label="Kartenseite wechseln" title="Kartenseite wechseln">↻</button>`
+            : ""
+        }
         <div class="details-actions">
           <button type="button" data-toggle-collection="${card.id}">
             ${isInCollection(card.id) ? "Aus Collection entfernen" : "In Collection speichern"}
           </button>
         </div>
       </div>
+
       <div class="meta">
         <div>
           <h3>${escapeHtml(cardName)}</h3>
-          <p class="muted">${escapeHtml(typeLine)}</p>
+          <p class="small-note">${escapeHtml(typeLine)}</p>
           <div class="pill-row details-pills">
             <span class="pill">Set: ${escapeHtml(card.set_name || "?")}</span>
             <span class="pill">Release: ${escapeHtml(card.released_at || "?")}</span>
@@ -458,19 +595,24 @@ async function selectCollectionCard(card) {
 }
 
 async function runSearch() {
-  const qüry = els.searchInput.value.trim();
-  if (!qüry) {
+  const query = els.searchInput.value.trim();
+  if (!query) {
     setStatus("Bitte einen Suchbegriff eingeben.", "err");
     return;
   }
 
-  setStatus(`Suche nach ${qüry}...`, "muted");
+  setStatus(`Suche nach ${query}...`, "muted");
   try {
-    state.results = await searchCards(qüry);
+    const result = await searchCardsWithTolerance(query);
+    state.results = result.cards;
     renderResults();
 
     if (state.results.length) {
-      setStatus(`${state.results.length} Treffer gefunden.`, "ok");
+      if (result.mode === "fuzzy" || result.mode === "autocomplete") {
+        setStatus(`Kein exakter Treffer. Zeige ähnlichen Treffer: ${result.correctedName}`, "ok");
+      } else {
+        setStatus(`${state.results.length} Treffer gefunden.`, "ok");
+      }
     } else {
       state.searchSelection = null;
       state.searchPrints = [];
@@ -485,6 +627,43 @@ async function runSearch() {
     renderSearchDetails();
     setStatus(`Fehler bei der Suche: ${error.message}`, "err");
   }
+}
+
+async function loadRandomCard() {
+  openSearchRoute();
+  setStatus("Ziehe Zufallskarte...", "muted");
+
+  try {
+    const card = await fetchRandomCard();
+    state.results = [card];
+    renderResults();
+    await selectSearchCard(card);
+    setStatus(`Zufallskarte geladen: ${card.name}`, "ok");
+  } catch (error) {
+    setStatus(`Zufallskarte konnte nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
+function bindQueryButtons() {
+  els.queryButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const query = button.dataset.query || "";
+      els.searchInput.value = query;
+      openSearchRoute();
+
+      if (button.dataset.autorun === "true") {
+        await runSearch();
+      }
+    });
+  });
+}
+
+function bindRandomButtons() {
+  els.randomButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadRandomCard();
+    });
+  });
 }
 
 els.searchBtn.addEventListener("click", runSearch);
@@ -526,9 +705,11 @@ if (els.collectionModal) {
   });
 }
 
+bindQueryButtons();
+bindRandomButtons();
 renderResults();
 renderSearchDetails();
 renderCollection();
 renderCollectionDetails();
 renderRoute();
-
+setStatus("Bereit. Gib einen Suchbegriff ein.", "muted");
