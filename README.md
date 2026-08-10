@@ -30,26 +30,25 @@ liegt in `.wrangler/` und ist von der echten getrennt.
 
 ## Auf Cloudflare in Betrieb nehmen
 
-1. Datenbank anlegen:
+Die Datenbank ist angelegt und ihre `database_id` steht bereits in
+`wrangler.jsonc`, das Schema ist angewendet. Für ein Deployment genügt:
 
-   ```bash
-   npm run db:create
-   ```
+```bash
+npm run deploy
+```
 
-2. Die ausgegebene `database_id` in `wrangler.jsonc` eintragen, sie
-   ersetzt dort `PLATZHALTER_DATABASE_ID`.
+Wer das Projekt in einem anderen Cloudflare-Konto aufsetzt, braucht
+vorher einmalig:
 
-3. Schema auf die echte Datenbank anwenden:
+```bash
+npx wrangler login
+npm run db:create      # gibt eine neue database_id aus
+                       # -> in wrangler.jsonc eintragen
+npm run db:migrate     # Schema auf die neue Datenbank anwenden
+```
 
-   ```bash
-   npm run db:migrate
-   ```
-
-4. Deployen:
-
-   ```bash
-   npm run deploy
-   ```
+Hängt `wrangler login` beim Zurückleiten auf `localhost:8976`, hilft
+stattdessen ein API-Token aus dem Dashboard in `CLOUDFLARE_API_TOKEN`.
 
 ## API
 
