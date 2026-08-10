@@ -1,0 +1,15 @@
+{
+  "name": "mtg-remasurium",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create remasurium",
+    "db:migrate:local": "wrangler d1 migrations apply remasurium --local",
+    "db:migrate": "wrangler d1 migrations apply remasurium --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.120.1"
+  }
+}
