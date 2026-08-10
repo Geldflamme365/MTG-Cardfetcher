@@ -6,7 +6,7 @@ Scryfall-API, Oracle-Text, Versionshistorie und eine eigene Collection.
 Ohne Konto läuft alles wie bisher rein im Browser. Mit Konto liegt die
 Collection auf Cloudflare und ist auf jedem Gerät gleich.
 
-Momentan ist er erreichbar unter mtg-remasurium.t-ackeret-inf24.workers.dev, da er fortläufig m developement ist.
+Momentan ist er erreichbar unter mtg-remasurium.t-ackeret-inf24.workers.dev, da er fortläufig im developement ist.
 
 ## Aufbau
 
