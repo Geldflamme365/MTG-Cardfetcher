@@ -11,9 +11,7 @@
     {
       "binding": "DB",
       "database_name": "remasurium",
-      // Wird von "npx wrangler d1 create remasurium" ausgegeben und muss
-      // hier eingetragen werden. Siehe README.
-      "database_id": "PLATZHALTER_DATABASE_ID"
+      "database_id": "99a51fea-8503-4b9c-8838-419a4ef77be5"
     }
   ],
   "observability": {
