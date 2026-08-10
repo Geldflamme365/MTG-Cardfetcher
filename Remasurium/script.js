@@ -1,3 +1,5 @@
+import { api } from "./api.js";
+
 const state = {
   results: [],
   searchSelection: null,
@@ -6,7 +8,8 @@ const state = {
   collectionSelection: null,
   collectionPrints: [],
   collectionFaceIndex: 0,
-  collection: loadCollection()
+  collection: loadCollection(),
+  user: null
 };
 
 const els = {
@@ -30,9 +33,25 @@ const els = {
   views: {
     home: document.getElementById("view-home"),
     suche: document.getElementById("view-suche"),
-    collection: document.getElementById("view-collection")
+    collection: document.getElementById("view-collection"),
+    account: document.getElementById("view-account")
   },
-  navLinks: document.querySelectorAll(".nav-link")
+  navLinks: document.querySelectorAll(".nav-link"),
+  authStatus: document.getElementById("authStatus"),
+  accountGuest: document.getElementById("accountGuest"),
+  accountUser: document.getElementById("accountUser"),
+  accountPanelTitle: document.getElementById("accountPanelTitle"),
+  accountFooter: document.getElementById("accountFooter"),
+  loginForm: document.getElementById("loginForm"),
+  registerForm: document.getElementById("registerForm"),
+  profileForm: document.getElementById("profileForm"),
+  profileEmail: document.getElementById("profileEmail"),
+  profileCreated: document.getElementById("profileCreated"),
+  profileName: document.getElementById("profileName"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  authTabs: document.querySelectorAll("[data-auth-tab]"),
+  collectionScopeLabel: document.getElementById("collectionScopeLabel"),
+  collectionScopeNote: document.getElementById("collectionScopeNote")
 };
 
 function setStatus(text, type = "muted") {
@@ -61,8 +80,24 @@ function loadCollection() {
   }
 }
 
+// Ohne Konto ist localStorage die Quelle der Wahrheit, mit Konto der
+// Server. Deshalb wird im Cloud-Modus bewusst nichts lokal gespiegelt:
+// so bleibt nach dem Abmelden nichts aus der Cloud im Browser liegen.
 function saveCollection() {
+  if (state.user) {
+    return;
+  }
   localStorage.setItem("remasurium.collection", JSON.stringify(state.collection));
+}
+
+function entryFromCard(card) {
+  return {
+    id: card.id,
+    name: card.name,
+    set_name: card.set_name ?? null,
+    released_at: card.released_at ?? null,
+    image: getCardPreviewUrl(card) || card.image || null
+  };
 }
 
 function normalizeRoute(hash) {
@@ -75,6 +110,9 @@ function normalizeRoute(hash) {
   }
   if (route === "collection") {
     return "collection";
+  }
+  if (route === "account") {
+    return "account";
   }
   return "home";
 }
@@ -92,7 +130,8 @@ function updateRouteChrome(route) {
   const labels = {
     home: "scry://remasurium/home",
     suche: "scry://remasurium/search",
-    collection: "scry://remasurium/collection"
+    collection: "scry://remasurium/collection",
+    account: "scry://remasurium/account"
   };
   const label = labels[route] || labels.home;
 
@@ -114,7 +153,8 @@ function renderRoute() {
   const titleMap = {
     home: "MTG Remasurium - Home",
     suche: "MTG Remasurium - Suche",
-    collection: "MTG Remasurium - Collection"
+    collection: "MTG Remasurium - Collection",
+    account: "MTG Remasurium - Account"
   };
 
   document.title = titleMap[route] || "MTG Remasurium";
@@ -264,14 +304,23 @@ function updateCollectionCount() {
   });
 }
 
-function toggleCollection(card) {
+function renderCollectionViews() {
+  renderCollection();
+  renderSearchDetails();
+  renderCollectionDetails();
+}
+
+async function toggleCollection(card) {
   if (!card) {
     return;
   }
 
-  if (isInCollection(card.id)) {
+  const removing = isInCollection(card.id);
+  const entry = entryFromCard(card);
+  const previous = state.collection;
+
+  if (removing) {
     state.collection = state.collection.filter((item) => item.id !== card.id);
-    setStatus(`${card.name} aus Collection entfernt.`, "ok");
 
     if (state.collectionSelection?.id === card.id) {
       state.collectionSelection = null;
@@ -279,20 +328,33 @@ function toggleCollection(card) {
       closeCollectionModal();
     }
   } else {
-    state.collection.unshift({
-      id: card.id,
-      name: card.name,
-      set_name: card.set_name,
-      released_at: card.released_at,
-      image: getCardPreviewUrl(card)
-    });
-    setStatus(`${card.name} zur Collection hinzugefügt.`, "ok");
+    state.collection = [entry, ...state.collection];
   }
 
   saveCollection();
-  renderCollection();
-  renderSearchDetails();
-  renderCollectionDetails();
+  renderCollectionViews();
+  setStatus(
+    removing ? `${card.name} aus Collection entfernt.` : `${card.name} zur Collection hinzugefügt.`,
+    "ok"
+  );
+
+  if (!state.user) {
+    return;
+  }
+
+  // Im Cloud-Modus zaehlt erst der Server. Schlaegt der Aufruf fehl,
+  // wird die Anzeige zurueckgedreht statt etwas Falsches zu zeigen.
+  try {
+    if (removing) {
+      await api.deleteCard(card.id);
+    } else {
+      await api.putCard(entry);
+    }
+  } catch (error) {
+    state.collection = previous;
+    renderCollectionViews();
+    setStatus(`Konnte nicht in der Cloud gespeichert werden: ${error.message}`, "err");
+  }
 }
 
 function renderResults() {
@@ -403,9 +465,20 @@ function updateCollectionPreview(card) {
     return item;
   });
 
-  if (changed) {
-    saveCollection();
-    renderCollection();
+  if (!changed) {
+    return;
+  }
+
+  saveCollection();
+  renderCollection();
+
+  if (state.user) {
+    const entry = state.collection.find((item) => item.id === card.id);
+    if (entry) {
+      api.putCard(entry).catch(() => {
+        // Nur das Vorschaubild, ein Fehlschlag darf die Ansicht nicht stoeren.
+      });
+    }
   }
 }
 
@@ -705,6 +778,162 @@ if (els.collectionModal) {
   });
 }
 
+function setAuthStatus(text, type = "muted") {
+  if (!els.authStatus) {
+    return;
+  }
+  els.authStatus.textContent = text;
+  els.authStatus.className = `status ${type}`;
+}
+
+function showAuthTab(name) {
+  els.authTabs.forEach((tab) => {
+    const active = tab.dataset.authTab === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  els.loginForm.hidden = name !== "login";
+  els.registerForm.hidden = name !== "register";
+}
+
+function renderAccount() {
+  const user = state.user;
+
+  els.accountGuest.hidden = Boolean(user);
+  els.accountUser.hidden = !user;
+  els.accountPanelTitle.textContent = user ? "profile" : "sign in";
+  els.accountFooter.textContent = user
+    ? `MTG Remasurium / cloud mode - ${user.displayName}`
+    : "MTG Remasurium / local mode";
+
+  if (user) {
+    els.profileEmail.textContent = user.email;
+    els.profileCreated.textContent = new Date(user.createdAt).toLocaleDateString("de-CH");
+    els.profileName.value = user.displayName;
+  }
+
+  els.collectionScopeLabel.textContent = user
+    ? "Karten in deiner Cloud-Collection"
+    : "cards saved locally in your browser";
+  els.collectionScopeNote.textContent = user
+    ? "Deine Collection liegt auf deinem Konto und ist auf jedem Gerät gleich."
+    : "Gespeicherte Karten bleiben nur in diesem Browser. Melde dich an, um sie in der Cloud zu sichern.";
+}
+
+// Nach Login oder Registrierung: lokale Karten hochschieben, danach
+// gilt der Serverstand.
+async function adoptSession(user, { mergeLocal = false } = {}) {
+  state.user = user;
+
+  try {
+    const local = mergeLocal ? loadCollection() : [];
+    const data = local.length ? await api.mergeCollection(local) : await api.getCollection();
+    state.collection = data.cards || [];
+
+    if (local.length) {
+      localStorage.removeItem("remasurium.collection");
+    }
+  } catch (error) {
+    state.collection = [];
+    setAuthStatus(`Collection konnte nicht geladen werden: ${error.message}`, "err");
+  }
+
+  renderAccount();
+  renderCollectionViews();
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  const email = els.loginForm.email.value.trim();
+  const password = els.loginForm.password.value;
+
+  setAuthStatus("Melde an...", "muted");
+  try {
+    const data = await api.login(email, password);
+    await adoptSession(data.user, { mergeLocal: true });
+    els.loginForm.reset();
+    setAuthStatus(`Angemeldet als ${data.user.email}.`, "ok");
+  } catch (error) {
+    setAuthStatus(error.message, "err");
+  }
+}
+
+async function handleRegister(event) {
+  event.preventDefault();
+  const email = els.registerForm.email.value.trim();
+  const password = els.registerForm.password.value;
+  const displayName = els.registerForm.displayName.value.trim();
+
+  setAuthStatus("Erstelle Konto...", "muted");
+  try {
+    const data = await api.register(email, password, displayName);
+    await adoptSession(data.user, { mergeLocal: true });
+    els.registerForm.reset();
+    setAuthStatus(`Konto erstellt. Angemeldet als ${data.user.email}.`, "ok");
+  } catch (error) {
+    setAuthStatus(error.message, "err");
+  }
+}
+
+async function handleProfileUpdate(event) {
+  event.preventDefault();
+  const displayName = els.profileName.value.trim();
+
+  setAuthStatus("Speichere...", "muted");
+  try {
+    const data = await api.updateProfile(displayName);
+    state.user = data.user;
+    renderAccount();
+    setAuthStatus("Profil gespeichert.", "ok");
+  } catch (error) {
+    setAuthStatus(error.message, "err");
+  }
+}
+
+async function handleLogout() {
+  setAuthStatus("Melde ab...", "muted");
+  try {
+    await api.logout();
+  } catch {
+    // Auch wenn der Server nicht antwortet, lokal abmelden.
+  }
+
+  state.user = null;
+  state.collection = loadCollection();
+  state.collectionSelection = null;
+  state.collectionPrints = [];
+  closeCollectionModal();
+
+  renderAccount();
+  renderCollectionViews();
+  showAuthTab("login");
+  setAuthStatus("Abgemeldet. Du siehst wieder die lokale Collection.", "ok");
+}
+
+// Laeuft die Seite ohne Worker (z.B. direkt als Datei geoeffnet),
+// bleibt es beim lokalen Modus statt einer Fehlermeldung.
+async function initAuth() {
+  renderAccount();
+
+  try {
+    const data = await api.me();
+    if (data.user) {
+      await adoptSession(data.user);
+      setAuthStatus(`Angemeldet als ${data.user.email}.`, "ok");
+    }
+  } catch {
+    setAuthStatus("Offline-Modus: Die Collection bleibt in diesem Browser.", "muted");
+  }
+}
+
+els.authTabs.forEach((tab) => {
+  tab.addEventListener("click", () => showAuthTab(tab.dataset.authTab));
+});
+els.loginForm.addEventListener("submit", handleLogin);
+els.registerForm.addEventListener("submit", handleRegister);
+els.profileForm.addEventListener("submit", handleProfileUpdate);
+els.logoutBtn.addEventListener("click", handleLogout);
+
 bindQueryButtons();
 bindRandomButtons();
 renderResults();
@@ -713,3 +942,4 @@ renderCollection();
 renderCollectionDetails();
 renderRoute();
 setStatus("Bereit. Gib einen Suchbegriff ein.", "muted");
+initAuth();
