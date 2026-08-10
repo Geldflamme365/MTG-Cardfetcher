@@ -1,2 +1,86 @@
-# MTG-Remasurium
-Here is my first ever Web application with API usage. It is a Magic: The Gathering Remasurium. With that you can easily fetch images of MTG Cards just by typing in their name in the search bar.
+# MTG Remasurium
+
+Ein Old-School-Cardfinder für Magic: The Gathering. Suche über die
+Scryfall-API, Oracle-Text, Versionshistorie und eine eigene Collection.
+
+Ohne Konto läuft alles wie bisher rein im Browser. Mit Konto liegt die
+Collection auf Cloudflare und ist auf jedem Gerät gleich.
+
+## Aufbau
+
+| Pfad | Inhalt |
+| --- | --- |
+| `Remasurium/` | Frontend, wird als statisches Asset ausgeliefert |
+| `src/index.js` | Worker mit der API unter `/api/*` |
+| `src/auth.js` | Passwort-Hashing und Sessions |
+| `migrations/` | D1-Schema |
+
+Kein Build-Schritt, kein Framework: HTML, CSS und JavaScript direkt.
+
+## Lokal starten
+
+```bash
+npm install
+npm run db:migrate:local
+npm run dev
+```
+
+Danach läuft alles auf <http://127.0.0.1:8787>. Die lokale Datenbank
+liegt in `.wrangler/` und ist von der echten getrennt.
+
+## Auf Cloudflare in Betrieb nehmen
+
+1. Datenbank anlegen:
+
+   ```bash
+   npm run db:create
+   ```
+
+2. Die ausgegebene `database_id` in `wrangler.jsonc` eintragen, sie
+   ersetzt dort `PLATZHALTER_DATABASE_ID`.
+
+3. Schema auf die echte Datenbank anwenden:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+4. Deployen:
+
+   ```bash
+   npm run deploy
+   ```
+
+## API
+
+Alle Endpunkte liegen unter `/api`. Die Session steckt in einem
+HttpOnly-Cookie und wird vom Browser automatisch mitgeschickt.
+
+| Methode | Pfad | Zweck |
+| --- | --- | --- |
+| POST | `/auth/register` | Konto anlegen, meldet direkt an |
+| POST | `/auth/login` | Anmelden |
+| POST | `/auth/logout` | Abmelden |
+| GET | `/auth/me` | Aktueller User oder `null` |
+| PATCH | `/profile` | Anzeigename ändern |
+| GET | `/collection` | Collection lesen |
+| PUT | `/collection/:cardId` | Karte anlegen oder aktualisieren |
+| DELETE | `/collection/:cardId` | Karte entfernen |
+| POST | `/collection/merge` | Lokale Karten übernehmen, ohne vorhandene zu überschreiben |
+
+## Zur Sicherheit
+
+- Passwörter werden mit PBKDF2-SHA256 gehasht, eigener Salt pro Konto.
+- Die Iterationszahl steht in `src/auth.js` und liegt bei 50 000. Grund:
+  Der Cloudflare-Free-Plan erlaubt 10 ms CPU pro Request, 50 000
+  Iterationen brauchen rund 6.5 ms. Die OWASP-Empfehlung von 210 000
+  würde das Limit sprengen. Wer auf den Paid-Plan wechselt, kann die
+  Konstante hochziehen — die pro Konto gespeicherte Iterationszahl sorgt
+  dafür, dass bestehende Logins weiter funktionieren.
+- In der Datenbank liegt nur der SHA-256-Hash des Session-Tokens.
+- Der Login hasht auch bei unbekannter E-Mail, damit die Antwortzeit
+  nicht verrät, welche Konten existieren.
+
+## Geplant
+
+- Decks aus der eigenen Collection bauen
