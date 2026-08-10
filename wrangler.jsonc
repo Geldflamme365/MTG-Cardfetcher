@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mtg-remasurium",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-10",
+  "assets": {
+    "directory": "./Remasurium",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "remasurium",
+      "database_id": "99a51fea-8503-4b9c-8838-419a4ef77be5"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

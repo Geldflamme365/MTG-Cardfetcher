@@ -22,6 +22,7 @@
         <a class="nav-link" href="#/home">Home</a>
         <a class="nav-link" href="#/suche">Suche</a>
         <a class="nav-link" href="#/collection">Collection</a>
+        <a class="nav-link" href="#/account">Account</a>
       </nav>
 
       <div class="address-row">
@@ -180,10 +181,10 @@
           <div class="panel-body">
             <div class="stat-box">
               <strong data-collection-count>0</strong>
-              <span>cards saved locally in your browser</span>
+              <span id="collectionScopeLabel">cards saved locally in your browser</span>
             </div>
 
-            <p class="small-note">
+            <p class="small-note" id="collectionScopeNote">
               Gespeicherte Karten werden mit <code>localStorage</code> behalten. Klick auf eine Karte, um sie wieder zu laden.
             </p>
 
@@ -206,8 +207,111 @@
       </div>
     </section>
 
+    <section id="view-account" class="view">
+      <div class="search-layout">
+        <article class="window panel console-panel">
+          <div class="panel-title-bar">
+            <span id="accountPanelTitle">sign in</span>
+          </div>
+          <div class="panel-body">
+            <div id="accountGuest">
+              <div class="tab-row" role="tablist" aria-label="Anmelden oder registrieren">
+                <button type="button" class="retro-button tab-button active" data-auth-tab="login" role="tab" aria-selected="true">Anmelden</button>
+                <button type="button" class="retro-button tab-button" data-auth-tab="register" role="tab" aria-selected="false">Konto erstellen</button>
+              </div>
+
+              <form id="loginForm" class="auth-form" autocomplete="on">
+                <label class="field-label" for="loginEmail">E-Mail</label>
+                <input id="loginEmail" name="email" type="email" autocomplete="username" required />
+
+                <label class="field-label" for="loginPassword">Passwort</label>
+                <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+
+                <div class="button-row">
+                  <button type="submit" class="retro-button">Anmelden</button>
+                </div>
+              </form>
+
+              <form id="registerForm" class="auth-form" hidden autocomplete="on">
+                <label class="field-label" for="registerName">Anzeigename</label>
+                <input id="registerName" name="displayName" type="text" autocomplete="nickname" maxlength="60" placeholder="optional" />
+
+                <label class="field-label" for="registerEmail">E-Mail</label>
+                <input id="registerEmail" name="email" type="email" autocomplete="username" required />
+
+                <label class="field-label" for="registerPassword">Passwort</label>
+                <input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="8" required />
+                <p class="small-note">Mindestens 8 Zeichen.</p>
+
+                <div class="button-row">
+                  <button type="submit" class="retro-button">Konto erstellen</button>
+                </div>
+              </form>
+            </div>
+
+            <div id="accountUser" hidden>
+              <div class="info-list">
+                <div class="info-row">
+                  <span>Angemeldet als</span>
+                  <strong id="profileEmail">-</strong>
+                </div>
+                <div class="info-row">
+                  <span>Dabei seit</span>
+                  <strong id="profileCreated">-</strong>
+                </div>
+                <div class="info-row">
+                  <span>Karten in der Cloud</span>
+                  <strong data-collection-count>0</strong>
+                </div>
+              </div>
+
+              <form id="profileForm" class="auth-form">
+                <label class="field-label" for="profileName">Anzeigename</label>
+                <input id="profileName" name="displayName" type="text" maxlength="60" required />
+                <div class="button-row">
+                  <button type="submit" class="retro-button">Speichern</button>
+                  <button type="button" id="logoutBtn" class="retro-button">Abmelden</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="status-wrap">
+              <span class="field-label">Status</span>
+              <div id="authStatus" class="status muted">Nicht angemeldet.</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="window panel results-panel">
+          <div class="panel-title-bar">
+            <span>why an account</span>
+          </div>
+          <div class="panel-body">
+            <div class="feature-grid">
+              <article class="mini-panel">
+                <h2>Collection in der Cloud</h2>
+                <p>Mit Konto liegt deine Collection auf Cloudflare statt nur im Browser. Gleicher Stand auf Handy und Laptop.</p>
+              </article>
+              <article class="mini-panel">
+                <h2>Nichts geht verloren</h2>
+                <p>Beim ersten Login werden die Karten aus diesem Browser automatisch übernommen.</p>
+              </article>
+              <article class="mini-panel">
+                <h2>Ohne Konto nutzbar</h2>
+                <p>Suche und lokale Collection funktionieren weiter ohne Anmeldung.</p>
+              </article>
+              <article class="mini-panel">
+                <h2>Später: Decks</h2>
+                <p>Auf dem Konto sollen künftig auch Decks aus deiner Collection gebaut werden können.</p>
+              </article>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <footer class="window status-bar">
-      <span>MTG Remasurium / local mode</span>
+      <span id="accountFooter">MTG Remasurium / local mode</span>
       <span id="routeFooter">scry://remasurium/home</span>
     </footer>
   </main>
@@ -232,6 +336,6 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

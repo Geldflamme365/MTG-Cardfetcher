@@ -520,6 +520,35 @@ input::placeholder {
   font-size: 0.92rem;
 }
 
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab-button.active {
+  color: #fff;
+  background: linear-gradient(180deg, #2f51d7, #10256f);
+  border-color: #9fb2ff #09103e #09103e #9fb2ff;
+  box-shadow:
+    inset 1px 1px 0 rgba(212, 220, 255, 0.35),
+    inset -1px -1px 0 rgba(7, 10, 31, 0.85);
+}
+
+.auth-form .field-label {
+  margin-top: 12px;
+  margin-bottom: 5px;
+}
+
+.auth-form .field-label:first-child {
+  margin-top: 0;
+}
+
+.auth-form .small-note {
+  margin-top: 6px;
+}
+
 .modal {
   position: fixed;
   inset: 0;
