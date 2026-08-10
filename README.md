@@ -1,23 +1,24 @@
 # MTG Remasurium
 
-Ein Old-School-Cardfinder für Magic: The Gathering. Suche über die
-Scryfall-API, Oracle-Text, Versionshistorie und eine eigene Collection.
+A card finder for Magic: The Gathering with an old-school look. You can
+search cards through the Scryfall API, read the Oracle text, look at older
+prints of the same card, and keep your own collection.
 
-Ohne Konto läuft alles wie bisher rein im Browser. Mit Konto liegt die
-Collection auf Cloudflare und ist auf jedem Gerät gleich.
+Without an account, everything stays in your browser. With an account, your
+collection is saved on Cloudflare, so it is the same on every device.
 
-## Aufbau
+## Project structure
 
-| Pfad | Inhalt |
+| Path | What it is |
 | --- | --- |
-| `Remasurium/` | Frontend, wird als statisches Asset ausgeliefert |
-| `src/index.js` | Worker mit der API unter `/api/*` |
-| `src/auth.js` | Passwort-Hashing und Sessions |
-| `migrations/` | D1-Schema |
+| `Remasurium/` | The website. It is served as static files. |
+| `src/index.js` | The Worker. It handles the API under `/api/*`. |
+| `src/auth.js` | Password hashing and sessions. |
+| `migrations/` | The database schema for D1. |
 
-Kein Build-Schritt, kein Framework: HTML, CSS und JavaScript direkt.
+There is no build step and no framework. Just HTML, CSS and JavaScript.
 
-## Lokal starten
+## Run it on your computer
 
 ```bash
 npm install
@@ -25,61 +26,66 @@ npm run db:migrate:local
 npm run dev
 ```
 
-Danach läuft alles auf <http://127.0.0.1:8787>. Die lokale Datenbank
-liegt in `.wrangler/` und ist von der echten getrennt.
+Then open <http://127.0.0.1:8787>. This uses a local test database in the
+`.wrangler/` folder. It is separate from the real one, so you cannot break
+anything.
 
-## Auf Cloudflare in Betrieb nehmen
+## Put it online
 
-Die Datenbank ist angelegt und ihre `database_id` steht bereits in
-`wrangler.jsonc`, das Schema ist angewendet. Für ein Deployment genügt:
+The database already exists and its id is in `wrangler.jsonc`. The schema is
+applied. So you only need:
 
 ```bash
 npm run deploy
 ```
 
-Wer das Projekt in einem anderen Cloudflare-Konto aufsetzt, braucht
-vorher einmalig:
+If you set this project up in a different Cloudflare account, do this once
+first:
 
 ```bash
 npx wrangler login
-npm run db:create      # gibt eine neue database_id aus
-                       # -> in wrangler.jsonc eintragen
-npm run db:migrate     # Schema auf die neue Datenbank anwenden
+npm run db:create      # this prints a new database id
+                       # -> copy it into wrangler.jsonc
+npm run db:migrate     # create the tables in the new database
 ```
 
-Hängt `wrangler login` beim Zurückleiten auf `localhost:8976`, hilft
-stattdessen ein API-Token aus dem Dashboard in `CLOUDFLARE_API_TOKEN`.
+If `wrangler login` gets stuck on `localhost:8976`, it means the login window
+closed too early. You can use an API token from the Cloudflare dashboard
+instead and put it in `CLOUDFLARE_API_TOKEN`.
 
-## API
+## The API
 
-Alle Endpunkte liegen unter `/api`. Die Session steckt in einem
-HttpOnly-Cookie und wird vom Browser automatisch mitgeschickt.
+Every route starts with `/api`. The session is stored in a cookie. The browser
+sends it automatically, so you do not have to handle it yourself.
 
-| Methode | Pfad | Zweck |
+| Method | Path | What it does |
 | --- | --- | --- |
-| POST | `/auth/register` | Konto anlegen, meldet direkt an |
-| POST | `/auth/login` | Anmelden |
-| POST | `/auth/logout` | Abmelden |
-| GET | `/auth/me` | Aktueller User oder `null` |
-| PATCH | `/profile` | Anzeigename ändern |
-| GET | `/collection` | Collection lesen |
-| PUT | `/collection/:cardId` | Karte anlegen oder aktualisieren |
-| DELETE | `/collection/:cardId` | Karte entfernen |
-| POST | `/collection/merge` | Lokale Karten übernehmen, ohne vorhandene zu überschreiben |
+| POST | `/auth/register` | Create an account and log in right away |
+| POST | `/auth/login` | Log in |
+| POST | `/auth/logout` | Log out |
+| GET | `/auth/me` | Show the current user, or `null` |
+| PATCH | `/profile` | Change the display name |
+| GET | `/collection` | Get the collection |
+| PUT | `/collection/:cardId` | Add or update one card |
+| DELETE | `/collection/:cardId` | Remove one card |
+| POST | `/collection/merge` | Copy local cards up without overwriting |
 
-## Zur Sicherheit
+## About security
 
-- Passwörter werden mit PBKDF2-SHA256 gehasht, eigener Salt pro Konto.
-- Die Iterationszahl steht in `src/auth.js` und liegt bei 50 000. Grund:
-  Der Cloudflare-Free-Plan erlaubt 10 ms CPU pro Request, 50 000
-  Iterationen brauchen rund 6.5 ms. Die OWASP-Empfehlung von 210 000
-  würde das Limit sprengen. Wer auf den Paid-Plan wechselt, kann die
-  Konstante hochziehen — die pro Konto gespeicherte Iterationszahl sorgt
-  dafür, dass bestehende Logins weiter funktionieren.
-- In der Datenbank liegt nur der SHA-256-Hash des Session-Tokens.
-- Der Login hasht auch bei unbekannter E-Mail, damit die Antwortzeit
-  nicht verrät, welche Konten existieren.
+- Passwords are hashed with PBKDF2-SHA256. Every account has its own salt.
+- The number of rounds is 50,000. You find it in `src/auth.js`. The reason for
+  this number: the Cloudflare free plan gives a Worker only 10 ms of CPU time
+  per request, and 50,000 rounds take about 6.5 ms. The OWASP number of
+  210,000 would take about 26 ms and would break the limit. Each account
+  stores the number of rounds it was created with, so you can raise the
+  constant later on a paid plan and old logins still work.
+- The database only stores a SHA-256 hash of the session token. Someone who
+  reads the database cannot take over a session with it.
+- Login also hashes a password when the email does not exist. Otherwise the
+  response time would tell an attacker which accounts are real.
 
-## Geplant
+## Not done yet
 
-- Decks aus der eigenen Collection bauen
+- No rate limiting on login, so passwords can be guessed many times.
+- No password reset, because that needs sending emails.
+- Building decks from your collection. This is the next big goal.
