@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mtg-remasurium",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-10",
+  "assets": {
+    "directory": "./Remasurium",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "remasurium",
+      // Wird von "npx wrangler d1 create remasurium" ausgegeben und muss
+      // hier eingetragen werden. Siehe README.
+      "database_id": "PLATZHALTER_DATABASE_ID"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
