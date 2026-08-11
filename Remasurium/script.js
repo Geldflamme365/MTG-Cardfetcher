@@ -50,6 +50,12 @@ const els = {
   accountFooter: document.getElementById("accountFooter"),
   loginForm: document.getElementById("loginForm"),
   registerForm: document.getElementById("registerForm"),
+  recoverForm: document.getElementById("recoverForm"),
+  recoveryPanel: document.getElementById("recoveryPanel"),
+  recoveryCode: document.getElementById("recoveryCode"),
+  copyRecoveryBtn: document.getElementById("copyRecoveryBtn"),
+  dismissRecoveryBtn: document.getElementById("dismissRecoveryBtn"),
+  newRecoveryBtn: document.getElementById("newRecoveryBtn"),
   profileForm: document.getElementById("profileForm"),
   profileEmail: document.getElementById("profileEmail"),
   profileCreated: document.getElementById("profileCreated"),
@@ -957,6 +963,25 @@ function showAuthTab(name) {
   });
   els.loginForm.hidden = name !== "login";
   els.registerForm.hidden = name !== "register";
+  els.recoverForm.hidden = name !== "recover";
+}
+
+// Der Code steht nur einmal zur Verfuegung, darum bleibt das Feld
+// stehen, bis es aktiv weggeklickt wird.
+function showRecoveryCode(code) {
+  if (!code || !els.recoveryPanel) {
+    return;
+  }
+  els.recoveryCode.textContent = code;
+  els.recoveryPanel.hidden = false;
+}
+
+function hideRecoveryCode() {
+  if (!els.recoveryPanel) {
+    return;
+  }
+  els.recoveryPanel.hidden = true;
+  els.recoveryCode.textContent = "-";
 }
 
 function renderAccount() {
@@ -1032,9 +1057,49 @@ async function handleRegister(event) {
     const data = await api.register(email, password, displayName);
     await adoptSession(data.user, { mergeLocal: true });
     els.registerForm.reset();
+    showRecoveryCode(data.recoveryCode);
     setAuthStatus(`Konto erstellt. Angemeldet als ${data.user.email}.`, "ok");
   } catch (error) {
     setAuthStatus(error.message, "err");
+  }
+}
+
+async function handleRecover(event) {
+  event.preventDefault();
+  const email = els.recoverForm.email.value.trim();
+  const code = els.recoverForm.recoveryCode.value.trim();
+  const newPassword = els.recoverForm.newPassword.value;
+
+  setAuthStatus("Setze Passwort zurück...", "muted");
+  try {
+    const data = await api.recover(email, code, newPassword);
+    await adoptSession(data.user, { mergeLocal: true });
+    els.recoverForm.reset();
+    showAuthTab("login");
+    showRecoveryCode(data.recoveryCode);
+    setAuthStatus("Passwort geändert. Der alte Code ist verbraucht, hier ist der neue.", "ok");
+  } catch (error) {
+    setAuthStatus(error.message, "err");
+  }
+}
+
+async function handleNewRecoveryCode() {
+  setAuthStatus("Erzeuge neuen Code...", "muted");
+  try {
+    const data = await api.newRecoveryCode();
+    showRecoveryCode(data.recoveryCode);
+    setAuthStatus("Neuer Code erzeugt. Der alte gilt nicht mehr.", "ok");
+  } catch (error) {
+    setAuthStatus(error.message, "err");
+  }
+}
+
+async function copyRecoveryCode() {
+  try {
+    await navigator.clipboard.writeText(els.recoveryCode.textContent);
+    setAuthStatus("Code in die Zwischenablage kopiert.", "ok");
+  } catch {
+    setAuthStatus("Kopieren hat nicht geklappt, bitte von Hand abschreiben.", "err");
   }
 }
 
@@ -1070,6 +1135,8 @@ async function handleLogout() {
   renderAccount();
   renderCollectionViews();
   showAuthTab("login");
+  // Keinen Code auf dem Bildschirm stehen lassen.
+  hideRecoveryCode();
   setAuthStatus("Abgemeldet. Du siehst wieder die lokale Collection.", "ok");
 }
 
@@ -1094,8 +1161,12 @@ els.authTabs.forEach((tab) => {
 });
 els.loginForm.addEventListener("submit", handleLogin);
 els.registerForm.addEventListener("submit", handleRegister);
+els.recoverForm.addEventListener("submit", handleRecover);
 els.profileForm.addEventListener("submit", handleProfileUpdate);
 els.logoutBtn.addEventListener("click", handleLogout);
+els.newRecoveryBtn.addEventListener("click", handleNewRecoveryCode);
+els.copyRecoveryBtn.addEventListener("click", copyRecoveryCode);
+els.dismissRecoveryBtn.addEventListener("click", hideRecoveryCode);
 
 bindQueryButtons();
 bindRandomButtons();

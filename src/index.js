@@ -3,8 +3,10 @@ import {
   buildSessionCookie,
   clearSessionCookie,
   createPasswordRecord,
+  createRecoveryRecord,
   createSessionToken,
   hashPassword,
+  hashRecoveryCode,
   readSessionToken,
   sessionExpiry,
   sha256Hex,
@@ -151,6 +153,7 @@ async function handleRegister(request, env) {
   }
 
   const record = await createPasswordRecord(password);
+  const recovery = await createRecoveryRecord();
   const user = {
     id: crypto.randomUUID(),
     email,
@@ -159,14 +162,28 @@ async function handleRegister(request, env) {
   };
 
   await env.DB.prepare(
-    `INSERT INTO users (id, email, display_name, password_hash, password_salt, iterations, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO users
+       (id, email, display_name, password_hash, password_salt, iterations, created_at,
+        recovery_hash, recovery_salt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
-    .bind(user.id, user.email, user.display_name, record.hash, record.salt, record.iterations, user.created_at)
+    .bind(
+      user.id,
+      user.email,
+      user.display_name,
+      record.hash,
+      record.salt,
+      record.iterations,
+      user.created_at,
+      recovery.hash,
+      recovery.salt
+    )
     .run();
 
   const session = await startSession(env, user.id);
-  return json({ user: publicUser(user) }, 201, {
+  // Der Code wird genau hier einmal ausgeliefert. Danach liegt nur noch
+  // sein Hash in der Datenbank.
+  return json({ user: publicUser(user), recoveryCode: recovery.code }, 201, {
     "Set-Cookie": buildSessionCookie(session.token, session.expiresAt)
   });
 }
@@ -209,6 +226,78 @@ async function handleLogin(request, env) {
   return json({ user: publicUser(row) }, 200, {
     "Set-Cookie": buildSessionCookie(session.token, session.expiresAt)
   });
+}
+
+// Passwort zuruecksetzen mit dem Wiederherstellungscode. Dieselbe Sperre
+// wie beim Login, sonst waere der Code durchprobierbar.
+async function handleRecover(request, env) {
+  const body = await readJson(request);
+  if (!body) {
+    return fail("Ungültiger Request-Body.");
+  }
+
+  const email = normalizeEmail(body.email);
+  const code = String(body.recoveryCode || "");
+  const newPassword = String(body.newPassword || "");
+
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    return fail(`Das neue Passwort braucht mindestens ${MIN_PASSWORD_LENGTH} Zeichen.`);
+  }
+
+  const keys = throttleKeys(email, request);
+  const lockedFor = await checkThrottle(env, keys);
+  if (lockedFor > 0) {
+    const minutes = Math.ceil(lockedFor / 60);
+    return json(
+      { error: `Zu viele Fehlversuche. Bitte in ${minutes} Minute${minutes === 1 ? "" : "n"} erneut versuchen.` },
+      429,
+      { "Retry-After": String(lockedFor) }
+    );
+  }
+
+  const row = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+
+  const salt = row?.recovery_salt || "unknown-account-placeholder-salt";
+  const candidate = await hashRecoveryCode(code, salt);
+
+  if (!row || !row.recovery_hash || !timingSafeEqual(candidate, row.recovery_hash)) {
+    await registerFailure(env, keys);
+    return fail("E-Mail oder Wiederherstellungscode stimmt nicht.", 401);
+  }
+
+  const record = await createPasswordRecord(newPassword);
+  // Der verbrauchte Code wird sofort durch einen neuen ersetzt.
+  const recovery = await createRecoveryRecord();
+
+  await env.DB.prepare(
+    `UPDATE users
+        SET password_hash = ?, password_salt = ?, iterations = ?,
+            recovery_hash = ?, recovery_salt = ?
+      WHERE id = ?`
+  )
+    .bind(record.hash, record.salt, record.iterations, recovery.hash, recovery.salt, row.id)
+    .run();
+
+  // Alte Sitzungen beenden: Wer das Passwort zuruecksetzt, soll auch
+  // jemanden aussperren, der bereits angemeldet war.
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(row.id).run();
+  await clearAttempts(env, keys);
+
+  const session = await startSession(env, row.id);
+  return json({ user: publicUser(row), recoveryCode: recovery.code }, 200, {
+    "Set-Cookie": buildSessionCookie(session.token, session.expiresAt)
+  });
+}
+
+// Erzeugt einen neuen Code und entwertet damit den alten.
+async function handleNewRecoveryCode(env, user) {
+  const recovery = await createRecoveryRecord();
+
+  await env.DB.prepare("UPDATE users SET recovery_hash = ?, recovery_salt = ? WHERE id = ?")
+    .bind(recovery.hash, recovery.salt, user.id)
+    .run();
+
+  return json({ recoveryCode: recovery.code });
 }
 
 async function handleLogout(request, env) {
@@ -354,6 +443,9 @@ async function handleApi(request, env, url) {
   if (path === "/auth/logout" && method === "POST") {
     return handleLogout(request, env);
   }
+  if (path === "/auth/recover" && method === "POST") {
+    return handleRecover(request, env);
+  }
 
   const session = await resolveSession(request, env);
 
@@ -368,6 +460,9 @@ async function handleApi(request, env, url) {
 
   if (path === "/profile" && method === "PATCH") {
     return handleUpdateProfile(request, env, user);
+  }
+  if (path === "/auth/recovery-code" && method === "POST") {
+    return handleNewRecoveryCode(env, user);
   }
   if (path === "/collection" && method === "GET") {
     return handleGetCollection(env, user);

@@ -60,6 +60,51 @@ export function createSessionToken() {
   return randomHex(32);
 }
 
+// Wiederherstellungscodes.
+//
+// Ohne I, L, O, 0 und 1, damit beim Abschreiben nichts verwechselt wird.
+// 12 Zeichen aus 31 Moeglichkeiten sind rund 59 Bit - zu viel zum
+// Durchprobieren, zumal die Reset-Route dieselbe Sperre hat wie der
+// Login. Anders als ein Passwort ist der Code also zufaellig genug,
+// dass ein schneller Hash mit eigenem Salt genuegt. Das ist hier auch
+// noetig: Ein zweites PBKDF2 wuerde bei der Registrierung zusammen mit
+// dem Passwort-Hash das CPU-Limit des Free-Plans sprengen.
+const RECOVERY_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+const RECOVERY_LENGTH = 12;
+
+export function createRecoveryCode() {
+  const chars = [];
+  const limit = Math.floor(256 / RECOVERY_ALPHABET.length) * RECOVERY_ALPHABET.length;
+
+  while (chars.length < RECOVERY_LENGTH) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(RECOVERY_LENGTH))) {
+      // Werte oberhalb des Vielfachen verwerfen, sonst waeren die
+      // vorderen Zeichen des Alphabets haeufiger.
+      if (byte < limit && chars.length < RECOVERY_LENGTH) {
+        chars.push(RECOVERY_ALPHABET[byte % RECOVERY_ALPHABET.length]);
+      }
+    }
+  }
+
+  const body = chars.join("");
+  return `REMA-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}`;
+}
+
+export function normalizeRecoveryCode(value) {
+  const clean = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return clean.length === RECOVERY_LENGTH ? `REMA${clean}` : clean;
+}
+
+export async function hashRecoveryCode(code, salt) {
+  return sha256Hex(`${salt}:${normalizeRecoveryCode(code)}`);
+}
+
+export async function createRecoveryRecord() {
+  const code = createRecoveryCode();
+  const salt = randomHex(16);
+  return { code, salt, hash: await hashRecoveryCode(code, salt) };
+}
+
 export function sessionExpiry() {
   return new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 }

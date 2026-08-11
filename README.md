@@ -67,6 +67,8 @@ sends it automatically, so you do not have to handle it yourself.
 | POST | `/auth/register` | Create an account and log in right away |
 | POST | `/auth/login` | Log in |
 | POST | `/auth/logout` | Log out |
+| POST | `/auth/recover` | Set a new password with the recovery code |
+| POST | `/auth/recovery-code` | Get a new recovery code (must be logged in) |
 | GET | `/auth/me` | Show the current user, or `null` |
 | PATCH | `/profile` | Change the display name |
 | GET | `/collection` | Get the collection |
@@ -87,9 +89,27 @@ sends it automatically, so you do not have to handle it yourself.
   reads the database cannot take over a session with it.
 - Login also hashes a password when the email does not exist. Otherwise the
   response time would tell an attacker which accounts are real.
+- Failed logins are counted per account (8 tries) and per IP address (30
+  tries) in a window of 15 minutes. After that the account or the address is
+  blocked for 15 minutes and the API answers with 429. Blocks expire on their
+  own, so nobody can lock you out of your account for good. A successful
+  login clears the counter.
+
+## Forgot your password
+
+There is no reset email. Cloudflare cannot send mail to any address, and an
+outside mail service would need a domain this project does not have.
+
+Instead every account gets a recovery code, shown once when you sign up. To
+get back in you enter your email, that code and a new password. The code is
+used up in the process and you get a new one right away. While you are logged
+in you can create a new code at any time, which makes the old one invalid.
+Only a hash of the code is stored.
+
+Resetting also ends all open sessions, so somebody who was already logged in
+gets kicked out. The reset route has the same block as the login, so the code
+cannot be guessed by trying many times.
 
 ## Not done yet
 
-- No rate limiting on login, so passwords can be guessed many times.
-- No password reset, because that needs sending emails.
 - Building decks from your collection. This is the next big goal.

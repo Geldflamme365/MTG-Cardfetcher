@@ -705,6 +705,39 @@ input::placeholder {
     inset -1px -1px 0 rgba(40, 6, 11, 0.85);
 }
 
+.recovery-panel {
+  margin-top: 16px;
+  padding: 14px;
+  color: #f6f0ff;
+  background: linear-gradient(180deg, rgba(40, 22, 78, 0.98), rgba(18, 9, 34, 0.98));
+  border: 2px solid;
+  border-color: var(--violet-edge) #0f071f #0f071f var(--violet-edge);
+}
+
+.recovery-panel h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.recovery-panel .small-note {
+  color: #cdbef8;
+}
+
+.recovery-panel code {
+  display: block;
+  padding: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid;
+  border-color: #0b0518 #6c5aa5 #6c5aa5 #0b0518;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  word-break: break-all;
+}
+
 .collection-button-icon {
   font-size: 1.1rem;
   line-height: 1;

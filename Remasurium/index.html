@@ -218,6 +218,7 @@
               <div class="tab-row" role="tablist" aria-label="Anmelden oder registrieren">
                 <button type="button" class="retro-button tab-button active" data-auth-tab="login" role="tab" aria-selected="true">Anmelden</button>
                 <button type="button" class="retro-button tab-button" data-auth-tab="register" role="tab" aria-selected="false">Konto erstellen</button>
+                <button type="button" class="retro-button tab-button" data-auth-tab="recover" role="tab" aria-selected="false">Passwort vergessen</button>
               </div>
 
               <form id="loginForm" class="auth-form" autocomplete="on">
@@ -247,6 +248,26 @@
                   <button type="submit" class="retro-button">Konto erstellen</button>
                 </div>
               </form>
+
+              <form id="recoverForm" class="auth-form" hidden>
+                <p class="small-note">
+                  Gib deinen Wiederherstellungscode ein. Den hast du bei der Registrierung bekommen.
+                </p>
+
+                <label class="field-label" for="recoverEmail">E-Mail</label>
+                <input id="recoverEmail" name="email" type="email" autocomplete="username" required />
+
+                <label class="field-label" for="recoverCode">Wiederherstellungscode</label>
+                <input id="recoverCode" name="recoveryCode" type="text" placeholder="REMA-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" required />
+
+                <label class="field-label" for="recoverPassword">Neues Passwort</label>
+                <input id="recoverPassword" name="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+                <p class="small-note">Mindestens 8 Zeichen.</p>
+
+                <div class="button-row">
+                  <button type="submit" class="retro-button">Passwort zurücksetzen</button>
+                </div>
+              </form>
             </div>
 
             <div id="accountUser" hidden>
@@ -273,6 +294,31 @@
                   <button type="button" id="logoutBtn" class="retro-button">Abmelden</button>
                 </div>
               </form>
+
+              <div class="tip-box">
+                <h2>Wiederherstellungscode</h2>
+                <p class="small-note">
+                  Damit kommst du wieder an dein Konto, wenn du das Passwort vergisst.
+                  Ein neuer Code macht den alten ungültig.
+                </p>
+                <div class="button-row">
+                  <button type="button" id="newRecoveryBtn" class="retro-button">Neuen Code erzeugen</button>
+                </div>
+              </div>
+            </div>
+
+            <div id="recoveryPanel" class="recovery-panel" hidden>
+              <h2>Dein Wiederherstellungscode</h2>
+              <code id="recoveryCode">-</code>
+              <p class="small-note">
+                Schreib ihn auf oder speichere ihn. Er wird nur dieses eine Mal
+                angezeigt und ist der einzige Weg zurück ins Konto, wenn du dein
+                Passwort vergisst.
+              </p>
+              <div class="button-row">
+                <button type="button" id="copyRecoveryBtn" class="retro-button">Kopieren</button>
+                <button type="button" id="dismissRecoveryBtn" class="retro-button">Habe ich gespeichert</button>
+              </div>
             </div>
 
             <div class="status-wrap">

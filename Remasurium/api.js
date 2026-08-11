@@ -34,6 +34,9 @@ export const api = {
     call("/auth/register", { method: "POST", body: { email, password, displayName } }),
   login: (email, password) => call("/auth/login", { method: "POST", body: { email, password } }),
   logout: () => call("/auth/logout", { method: "POST" }),
+  recover: (email, recoveryCode, newPassword) =>
+    call("/auth/recover", { method: "POST", body: { email, recoveryCode, newPassword } }),
+  newRecoveryCode: () => call("/auth/recovery-code", { method: "POST", body: {} }),
   updateProfile: (displayName) => call("/profile", { method: "PATCH", body: { displayName } }),
   getCollection: () => call("/collection"),
   mergeCollection: (cards) => call("/collection/merge", { method: "POST", body: { cards } }),
