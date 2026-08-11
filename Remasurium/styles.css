@@ -626,23 +626,88 @@ input::placeholder {
   gap: 8px;
 }
 
-.analysis,
-.versions {
+.analysis {
   display: grid;
   gap: 10px;
 }
 
-.versions {
-  max-height: 280px;
-  overflow: auto;
+.versions-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.entry {
+.versions-head h3 {
+  margin: 0;
+}
+
+/* Liegt ueber der Detailansicht, aus der es geoeffnet wurde. */
+#versionModal {
+  z-index: 1300;
+}
+
+#versionModal .modal-dialog {
+  width: min(1140px, 96vw);
+}
+
+/* Das Fenster ist breiter als das Ergebnis-Panel. Ohne feste
+   Spaltenzahl bleiben die Karten so gross wie in der Suche, statt
+   mitzuwachsen. */
+#versionList {
+  margin-top: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.version-tile .tile-caption small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.version-tile.active .tile-caption {
+  color: #fff;
+  background: linear-gradient(180deg, #2f51d7, #10256f);
+}
+
+.version-tile.active .tile-caption small {
+  color: #d4dcff;
+}
+
+.version-fallback {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px;
+  place-items: center;
+  aspect-ratio: 63 / 88;
+  padding: 8px;
+  color: #cdbef8;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.collection-button {
+  width: 100%;
+  min-height: 46px;
+  gap: 10px;
+  color: #fff;
+  background: linear-gradient(180deg, #2f51d7, #10256f);
+  border-color: #9fb2ff #09103e #09103e #9fb2ff;
+  box-shadow:
+    inset 1px 1px 0 rgba(212, 220, 255, 0.35),
+    inset -1px -1px 0 rgba(7, 10, 31, 0.85);
+}
+
+.collection-button.is-saved {
+  background: linear-gradient(180deg, #a33745, #62111c);
+  border-color: #e6a3ac #3f0a11 #3f0a11 #e6a3ac;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 214, 220, 0.3),
+    inset -1px -1px 0 rgba(40, 6, 11, 0.85);
+}
+
+.collection-button-icon {
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .raw {
