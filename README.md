@@ -7,6 +7,10 @@ prints of the same card, and keep your own collection.
 Without an account, everything stays in your browser. With an account, your
 collection is saved on Cloudflare, so it is the same on every device.
 
+You can try it right now at
+<https://mtg-remasurium.t-ackeret-inf24.workers.dev>. It is still in
+development, so things can change.
+
 ## Project structure
 
 | Path | What it is |
