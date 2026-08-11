@@ -8,6 +8,7 @@ const state = {
   collectionSelection: null,
   collectionPrints: [],
   collectionFaceIndex: 0,
+  versionModalContext: null,
   collection: loadCollection(),
   user: null
 };
@@ -24,6 +25,11 @@ const els = {
   modalCloseBtn: document.getElementById("modalCloseBtn"),
   collectionModal: document.getElementById("collectionModal"),
   collectionModalCloseBtn: document.getElementById("collectionModalCloseBtn"),
+  versionModal: document.getElementById("versionModal"),
+  versionModalCloseBtn: document.getElementById("versionModalCloseBtn"),
+  versionModalTitle: document.getElementById("versionModalTitle"),
+  versionModalNote: document.getElementById("versionModalNote"),
+  versionList: document.getElementById("versionList"),
   collection: document.getElementById("collection"),
   collectionDetails: document.getElementById("collectionDetails"),
   resultCountOutputs: document.querySelectorAll("[data-results-count]"),
@@ -160,6 +166,7 @@ function renderRoute() {
   document.title = titleMap[route] || "MTG Remasurium";
   setActiveNav(route);
   updateRouteChrome(route);
+  closeVersionModal();
   closeSearchModal();
   closeCollectionModal();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -482,26 +489,37 @@ function updateCollectionPreview(card) {
   }
 }
 
-function renderVersionList(prints, context) {
+// In der Detailansicht steht nur der Knopf. Die Versionen selbst
+// kommen in ein eigenes Fenster, damit die Detailansicht nicht von
+// einer langen Bilderliste erschlagen wird.
+function renderVersionSection(prints) {
   if (!prints.length) {
-    return `<p class="small-note">Keine Versionsdaten vorhanden.</p>`;
+    return `
+      <div>
+        <h3>Versionen</h3>
+        <p class="small-note">Keine Versionsdaten vorhanden.</p>
+      </div>
+    `;
+  }
+
+  if (prints.length === 1) {
+    return `
+      <div>
+        <h3>Versionen</h3>
+        <p class="small-note">Von dieser Karte gibt es nur diesen einen Print.</p>
+      </div>
+    `;
   }
 
   return `
-    <div class="versions">
-      ${prints
-        .map(
-          (print) => `
-            <div class="entry">
-              <div>
-                <strong>${escapeHtml(print.set_name || "Unbekanntes Set")}</strong><br />
-                <small>${escapeHtml(print.collector_number || "?")} - ${escapeHtml(print.released_at || "?")}</small>
-              </div>
-              <button type="button" data-print="${print.id}" data-context="${context}">Öffnen</button>
-            </div>
-          `
-        )
-        .join("")}
+    <div>
+      <div class="versions-head">
+        <h3>Versionen</h3>
+        <button type="button" class="retro-button version-toggle" data-open-versions="1">
+          Version ändern (${prints.length})
+        </button>
+      </div>
+      <p class="small-note">Öffnet alle ${prints.length} Prints in einem eigenen Fenster.</p>
     </div>
   `;
 }
@@ -539,8 +557,13 @@ function createDetailsHtml(card, prints, context) {
             : ""
         }
         <div class="details-actions">
-          <button type="button" data-toggle-collection="${card.id}">
-            ${isInCollection(card.id) ? "Aus Collection entfernen" : "In Collection speichern"}
+          <button
+            type="button"
+            class="retro-button collection-button${isInCollection(card.id) ? " is-saved" : ""}"
+            data-toggle-collection="${card.id}"
+          >
+            <span class="collection-button-icon" aria-hidden="true">${isInCollection(card.id) ? "★" : "☆"}</span>
+            <span>${isInCollection(card.id) ? "Aus Collection entfernen" : "In Collection speichern"}</span>
           </button>
         </div>
       </div>
@@ -561,10 +584,7 @@ function createDetailsHtml(card, prints, context) {
           <div class="raw">${escapeHtml(oracleText)}</div>
         </div>
 
-        <div>
-          <h3>Vergangene Versionen</h3>
-          ${renderVersionList(prints, context)}
-        </div>
+        ${renderVersionSection(prints)}
       </div>
     </div>
   `;
@@ -579,23 +599,9 @@ function bindDetailsEvents(container, context) {
     });
   }
 
-  for (const btn of container.querySelectorAll("button[data-print]")) {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.print;
-      const targetContext = btn.dataset.context;
-
-      try {
-        setStatus("Lade Version...", "muted");
-        const selectedPrint = await fetchJson(`https://api.scryfall.com/cards/${id}`);
-        if (targetContext === "search") {
-          await selectSearchCard(selectedPrint);
-        } else {
-          await selectCollectionCard(selectedPrint);
-        }
-      } catch (error) {
-        setStatus(`Version konnte nicht geladen werden: ${error.message}`, "err");
-      }
-    });
+  const openVersions = container.querySelector("button[data-open-versions]");
+  if (openVersions) {
+    openVersions.addEventListener("click", () => openVersionModal(context));
   }
 
   const flipBtn = container.querySelector("button[data-flip-face]");
@@ -618,6 +624,93 @@ function bindDetailsEvents(container, context) {
   }
 }
 
+// Das Versionsfenster nutzt bewusst dieselben Klassen wie das
+// Suchergebnis-Raster, damit die Karten dort gleich gross erscheinen.
+function renderVersionModal() {
+  const context = state.versionModalContext;
+  if (!context || !els.versionList) {
+    return;
+  }
+
+  const card = context === "search" ? state.searchSelection : state.collectionSelection;
+  const prints = context === "search" ? state.searchPrints : state.collectionPrints;
+
+  if (els.versionModalTitle) {
+    els.versionModalTitle.textContent = card ? `versions - ${card.name.toLowerCase()}` : "card versions";
+  }
+  if (els.versionModalNote) {
+    els.versionModalNote.textContent = `${prints.length} Prints. Klick auf ein Bild, um zu dieser Version zu wechseln.`;
+  }
+
+  els.versionList.innerHTML = prints
+    .map((print) => {
+      const preview = getCardPreviewUrl(print);
+      const active = print.id === card?.id;
+      return `
+        <button
+          type="button"
+          class="search-tile version-tile${active ? " active" : ""}"
+          data-print="${print.id}"
+          data-context="${context}"
+          title="${escapeHtml(print.set_name || "Unbekanntes Set")}"
+          ${active ? 'aria-current="true"' : ""}
+        >
+          <span class="tile-frame">
+            ${
+              preview
+                ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(print.set_name || print.name)}" loading="lazy" />`
+                : `<span class="version-fallback">${escapeHtml(print.set_name || "?")}</span>`
+            }
+          </span>
+          <span class="tile-caption">
+            ${escapeHtml(print.set_name || "Unbekanntes Set")}
+            <small>${escapeHtml(print.collector_number || "?")} - ${escapeHtml(print.released_at || "?")}</small>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+
+  for (const tile of els.versionList.querySelectorAll("button[data-print]")) {
+    tile.addEventListener("click", async () => {
+      const targetContext = tile.dataset.context;
+
+      try {
+        setStatus("Lade Version...", "muted");
+        const selectedPrint = await fetchJson(`https://api.scryfall.com/cards/${tile.dataset.print}`);
+        // Nach der Wahl schliesst sich das Fenster wieder, darum kuemmert
+        // sich selectSearchCard bzw. selectCollectionCard.
+        if (targetContext === "search") {
+          await selectSearchCard(selectedPrint);
+        } else {
+          await selectCollectionCard(selectedPrint);
+        }
+      } catch (error) {
+        setStatus(`Version konnte nicht geladen werden: ${error.message}`, "err");
+      }
+    });
+  }
+}
+
+function openVersionModal(context) {
+  if (!els.versionModal) {
+    return;
+  }
+  state.versionModalContext = context;
+  renderVersionModal();
+  els.versionModal.classList.add("open");
+  els.versionModal.setAttribute("aria-hidden", "false");
+}
+
+function closeVersionModal() {
+  if (!els.versionModal) {
+    return;
+  }
+  state.versionModalContext = null;
+  els.versionModal.classList.remove("open");
+  els.versionModal.setAttribute("aria-hidden", "true");
+}
+
 function renderSearchDetails() {
   els.searchDetails.innerHTML = createDetailsHtml(state.searchSelection, state.searchPrints, "search");
   bindDetailsEvents(els.searchDetails, "search");
@@ -631,6 +724,7 @@ function renderCollectionDetails() {
 async function selectSearchCard(card) {
   state.searchSelection = card;
   state.searchFaceIndex = 0;
+  closeVersionModal();
   renderResults();
   renderSearchDetails();
   openSearchModal();
@@ -650,6 +744,7 @@ async function selectSearchCard(card) {
 async function selectCollectionCard(card) {
   state.collectionSelection = card;
   state.collectionFaceIndex = 0;
+  closeVersionModal();
   updateCollectionPreview(card);
   renderCollection();
   renderCollectionDetails();
@@ -747,11 +842,18 @@ els.searchInput.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("hashchange", renderRoute);
+// Escape schliesst zuerst nur das Versionsfenster, damit man nicht aus
+// der Detailansicht fliegt, bloss weil man die Auswahl wegklicken will.
 window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closeSearchModal();
-    closeCollectionModal();
+  if (event.key !== "Escape") {
+    return;
   }
+  if (state.versionModalContext) {
+    closeVersionModal();
+    return;
+  }
+  closeSearchModal();
+  closeCollectionModal();
 });
 
 if (els.modalCloseBtn) {
@@ -762,6 +864,18 @@ if (els.searchModal) {
   els.searchModal.addEventListener("click", (event) => {
     if (event.target === els.searchModal) {
       closeSearchModal();
+    }
+  });
+}
+
+if (els.versionModalCloseBtn) {
+  els.versionModalCloseBtn.addEventListener("click", closeVersionModal);
+}
+
+if (els.versionModal) {
+  els.versionModal.addEventListener("click", (event) => {
+    if (event.target === els.versionModal) {
+      closeVersionModal();
     }
   });
 }
