@@ -44,7 +44,8 @@ export const api = {
         name: card.name,
         set_name: card.set_name,
         released_at: card.released_at,
-        image: card.image
+        image: card.image,
+        added_at: card.added_at
       }
     }),
   deleteCard: (cardId) => call(`/collection/${encodeURIComponent(cardId)}`, { method: "DELETE" })

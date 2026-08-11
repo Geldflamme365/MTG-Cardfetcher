@@ -96,13 +96,14 @@ function saveCollection() {
   localStorage.setItem("remasurium.collection", JSON.stringify(state.collection));
 }
 
-function entryFromCard(card) {
+function entryFromCard(card, addedAt = null) {
   return {
     id: card.id,
     name: card.name,
     set_name: card.set_name ?? null,
     released_at: card.released_at ?? null,
-    image: getCardPreviewUrl(card) || card.image || null
+    image: getCardPreviewUrl(card) || card.image || null,
+    added_at: addedAt
   };
 }
 
@@ -309,6 +310,42 @@ function updateCollectionCount() {
   els.collectionCountOutputs.forEach((node) => {
     node.textContent = text;
   });
+}
+
+// Ein Versionswechsel an einer gespeicherten Karte tauscht den Eintrag
+// aus, statt eine zweite Karte anzulegen. Der Platz in der Collection
+// bleibt erhalten, weil das Hinzufuegedatum mitwandert.
+async function replaceCollectionCard(previousId, nextCard) {
+  const index = state.collection.findIndex((item) => item.id === previousId);
+  if (index === -1) {
+    return false;
+  }
+
+  const previous = state.collection;
+  const entry = entryFromCard(nextCard, state.collection[index].added_at || null);
+
+  const updated = state.collection.slice();
+  updated[index] = entry;
+  state.collection = updated;
+
+  saveCollection();
+  renderCollection();
+
+  if (!state.user) {
+    return true;
+  }
+
+  try {
+    await api.putCard(entry);
+    await api.deleteCard(previousId);
+    return true;
+  } catch (error) {
+    state.collection = previous;
+    saveCollection();
+    renderCollection();
+    setStatus(`Version konnte in der Cloud nicht geändert werden: ${error.message}`, "err");
+    return false;
+  }
 }
 
 function renderCollectionViews() {
@@ -683,7 +720,19 @@ function renderVersionModal() {
         if (targetContext === "search") {
           await selectSearchCard(selectedPrint);
         } else {
+          const previousId = state.collectionSelection?.id;
+          const shouldReplace =
+            previousId && previousId !== selectedPrint.id && isInCollection(previousId);
+          const replaced = shouldReplace ? await replaceCollectionCard(previousId, selectedPrint) : false;
+
           await selectCollectionCard(selectedPrint);
+
+          if (replaced) {
+            setStatus(
+              `Gespeicherte Karte auf ${selectedPrint.set_name || "andere Version"} umgestellt.`,
+              "ok"
+            );
+          }
         }
       } catch (error) {
         setStatus(`Version konnte nicht geladen werden: ${error.message}`, "err");
