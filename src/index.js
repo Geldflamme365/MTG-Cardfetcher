@@ -64,7 +64,10 @@ function cardFromInput(input) {
     name: name.slice(0, 300),
     set_name: input.set_name ? String(input.set_name).slice(0, 200) : null,
     released_at: input.released_at ? String(input.released_at).slice(0, 20) : null,
-    image: input.image ? String(input.image).slice(0, 500) : null
+    image: input.image ? String(input.image).slice(0, 500) : null,
+    // Wird beim Versionswechsel mitgeschickt, damit die Karte in der
+    // Collection an ihrer Stelle bleibt statt nach vorne zu springen.
+    added_at: input.added_at ? String(input.added_at).slice(0, 40) : null
   };
 }
 
@@ -74,7 +77,8 @@ function cardFromRow(row) {
     name: row.name,
     set_name: row.set_name,
     released_at: row.released_at,
-    image: row.image
+    image: row.image,
+    added_at: row.added_at
   };
 }
 
@@ -258,7 +262,15 @@ async function handlePutCard(request, env, user, cardId) {
        released_at = excluded.released_at,
        image = excluded.image`
   )
-    .bind(user.id, card.id, card.name, card.set_name, card.released_at, card.image, new Date().toISOString())
+    .bind(
+      user.id,
+      card.id,
+      card.name,
+      card.set_name,
+      card.released_at,
+      card.image,
+      card.added_at || new Date().toISOString()
+    )
     .run();
 
   return json({ card });
@@ -281,7 +293,7 @@ async function handleMergeCollection(request, env, user) {
   }
 
   const cards = input.map(cardFromInput).filter(Boolean).slice(0, MAX_COLLECTION_SIZE);
-  const now = new Date().toISOString();
+  const now = Date.now();
 
   if (cards.length) {
     const statement = env.DB.prepare(
@@ -291,8 +303,19 @@ async function handleMergeCollection(request, env, user) {
     );
 
     await env.DB.batch(
-      cards.map((card) =>
-        statement.bind(user.id, card.id, card.name, card.set_name, card.released_at, card.image, now)
+      cards.map((card, index) =>
+        statement.bind(
+          user.id,
+          card.id,
+          card.name,
+          card.set_name,
+          card.released_at,
+          card.image,
+          // Absteigende Zeitmarken, damit die Reihenfolge aus dem
+          // Browser erhalten bleibt. Bei identischen Werten waere die
+          // Sortierung sonst zufaellig.
+          card.added_at || new Date(now - index * 1000).toISOString()
+        )
       )
     );
   }
