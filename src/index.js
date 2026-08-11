@@ -10,6 +10,7 @@ import {
   sha256Hex,
   timingSafeEqual
 } from "./auth.js";
+import { checkThrottle, clearAttempts, registerFailure, throttleKeys } from "./throttle.js";
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_COLLECTION_SIZE = 5000;
@@ -179,6 +180,17 @@ async function handleLogin(request, env) {
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
 
+  const keys = throttleKeys(email, request);
+  const lockedFor = await checkThrottle(env, keys);
+  if (lockedFor > 0) {
+    const minutes = Math.ceil(lockedFor / 60);
+    return json(
+      { error: `Zu viele Fehlversuche. Bitte in ${minutes} Minute${minutes === 1 ? "" : "n"} erneut versuchen.` },
+      429,
+      { "Retry-After": String(lockedFor) }
+    );
+  }
+
   const row = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
 
   // Auch ohne Treffer wird gehasht, damit die Antwortzeit nicht verraet,
@@ -188,9 +200,11 @@ async function handleLogin(request, env) {
   const candidate = await hashPassword(password, salt, iterations);
 
   if (!row || !timingSafeEqual(candidate, row.password_hash)) {
+    await registerFailure(env, keys);
     return fail("E-Mail oder Passwort stimmt nicht.", 401);
   }
 
+  await clearAttempts(env, keys);
   const session = await startSession(env, row.id);
   return json({ user: publicUser(row) }, 200, {
     "Set-Cookie": buildSessionCookie(session.token, session.expiresAt)
