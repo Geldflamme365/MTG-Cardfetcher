@@ -16,7 +16,11 @@ const state = {
   activeDeck: null,
   activeDeckCards: [],
   deckResults: [],
-  deckVersionCard: null
+  deckVersionCard: null,
+  deckSelection: null,
+  deckPrints: [],
+  deckFaceIndex: 0,
+  commanderCard: null
 };
 
 const deckStore = createDeckStore({ isLoggedIn: () => Boolean(state.user) });
@@ -24,7 +28,8 @@ const deckStore = createDeckStore({ isLoggedIn: () => Boolean(state.user) });
 // Laufende Nummer je Ansicht, um veraltete Antworten zu erkennen.
 const selectionCounters = {
   search: 0,
-  collection: 0
+  collection: 0,
+  deck: 0
 };
 
 const els = {
@@ -71,7 +76,11 @@ const els = {
   deckSearchBtn: document.getElementById("deckSearchBtn"),
   deckSearchResults: document.getElementById("deckSearchResults"),
   deckSearchCount: document.getElementById("deckSearchCount"),
-  deckQueryButtons: document.querySelectorAll("[data-deck-query]"),
+  deckQueryBank: document.getElementById("deckQueryBank"),
+  deckQueryNote: document.getElementById("deckQueryNote"),
+  deckCardModal: document.getElementById("deckCardModal"),
+  deckCardModalCloseBtn: document.getElementById("deckCardModalCloseBtn"),
+  deckCardDetails: document.getElementById("deckCardDetails"),
   deckNameInput: document.getElementById("deckNameInput"),
   renameDeckBtn: document.getElementById("renameDeckBtn"),
   deleteDeckBtn: document.getElementById("deleteDeckBtn"),
@@ -223,6 +232,7 @@ function renderRoute() {
   setActiveNav(route);
   updateRouteChrome(route);
   closeVersionModal();
+  closeDeckCardModal();
   closeSearchModal();
   closeCollectionModal();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -703,7 +713,13 @@ function createDetailsHtml(card, prints, context) {
       : `<p class="small-note">Noch keine Karte aus der Collection geöffnet.</p>`;
   }
 
-  const activeFaceIndex = context === "search" ? state.searchFaceIndex : state.collectionFaceIndex;
+  const faceIndexes = {
+    search: state.searchFaceIndex,
+    collection: state.collectionFaceIndex,
+    deck: state.deckFaceIndex
+  };
+  const activeFaceIndex = faceIndexes[context] ?? 0;
+  const inDeck = state.activeDeckCards.some((entry) => entry.id === card.id);
   const hasFaces = Array.isArray(card.card_faces) && card.card_faces.length > 1;
   const safeFaceIndex = hasFaces ? Math.max(0, Math.min(activeFaceIndex, card.card_faces.length - 1)) : 0;
   const face = hasFaces ? card.card_faces[safeFaceIndex] : null;
@@ -729,14 +745,17 @@ function createDetailsHtml(card, prints, context) {
             : ""
         }
         <div class="details-actions">
-          <button
-            type="button"
-            class="retro-button collection-button${isInCollection(card.id) ? " is-saved" : ""}"
-            data-toggle-collection="${card.id}"
-          >
-            <span class="collection-button-icon" aria-hidden="true">${isInCollection(card.id) ? "★" : "☆"}</span>
-            <span>${isInCollection(card.id) ? "Aus Collection entfernen" : "In Collection speichern"}</span>
-          </button>
+          ${
+            context === "deck"
+              ? `<button type="button" class="retro-button collection-button${inDeck ? " is-saved" : ""}" data-toggle-deck="${card.id}">
+                   <span class="collection-button-icon" aria-hidden="true">${inDeck ? "−" : "+"}</span>
+                   <span>${inDeck ? "Aus dem Deck entfernen" : "Hinzufügen"}</span>
+                 </button>`
+              : `<button type="button" class="retro-button collection-button${isInCollection(card.id) ? " is-saved" : ""}" data-toggle-collection="${card.id}">
+                   <span class="collection-button-icon" aria-hidden="true">${isInCollection(card.id) ? "★" : "☆"}</span>
+                   <span>${isInCollection(card.id) ? "Aus Collection entfernen" : "In Collection speichern"}</span>
+                 </button>`
+          }
         </div>
       </div>
 
@@ -776,10 +795,32 @@ function bindDetailsEvents(container, context) {
     openVersions.addEventListener("click", () => openVersionModal(context));
   }
 
+  const deckToggle = container.querySelector("button[data-toggle-deck]");
+  if (deckToggle) {
+    deckToggle.addEventListener("click", async () => {
+      const card = state.deckSelection;
+      if (!card) {
+        return;
+      }
+      if (state.activeDeckCards.some((entry) => entry.id === card.id)) {
+        await removeDeckCard(card.id);
+      } else {
+        await addCardToDeck(card);
+      }
+      renderDeckCardDetails();
+    });
+  }
+
   const flipBtn = container.querySelector("button[data-flip-face]");
   if (flipBtn) {
     flipBtn.addEventListener("click", () => {
-      if (context === "search") {
+      if (context === "deck") {
+        const faces = state.deckSelection?.card_faces || [];
+        if (faces.length > 1) {
+          state.deckFaceIndex = state.deckFaceIndex === 0 ? 1 : 0;
+          renderDeckCardDetails();
+        }
+      } else if (context === "search") {
         const faces = state.searchSelection?.card_faces || [];
         if (faces.length > 1) {
           state.searchFaceIndex = state.searchFaceIndex === 0 ? 1 : 0;
@@ -804,8 +845,11 @@ function renderVersionModal() {
     return;
   }
 
-  const card = context === "collection" ? state.collectionSelection : state.searchSelection;
-  const prints = context === "collection" ? state.collectionPrints : state.searchPrints;
+  const sources = {
+    collection: [state.collectionSelection, state.collectionPrints],
+    deck: [state.deckSelection, state.deckPrints]
+  };
+  const [card, prints] = sources[context] || [state.searchSelection, state.searchPrints];
 
   if (els.versionModalTitle) {
     els.versionModalTitle.textContent = card ? `versions - ${card.name.toLowerCase()}` : "card versions";
@@ -853,6 +897,21 @@ function renderVersionModal() {
         // Nach der Wahl schliesst sich das Fenster wieder, darum kuemmert
         // sich selectSearchCard bzw. selectCollectionCard.
         if (targetContext === "deck") {
+          // Steht die Karte schon im Deck, wird dort die Ausgabe
+          // getauscht. Sonst wird nur die Detailansicht umgestellt.
+          const previous = state.deckSelection;
+          const entry = state.activeDeckCards.find((card) => card.id === previous?.id);
+
+          state.deckSelection = selectedPrint;
+          state.deckFaceIndex = 0;
+          closeVersionModal();
+
+          if (entry) {
+            state.deckVersionCard = entry;
+            await applyDeckVersion(selectedPrint);
+          }
+          renderDeckCardDetails();
+        } else if (targetContext === "deckcard") {
           closeVersionModal();
           await applyDeckVersion(selectedPrint);
         } else if (targetContext === "commander") {
@@ -1067,6 +1126,7 @@ window.addEventListener("keydown", (event) => {
     closeVersionModal();
     return;
   }
+  closeDeckCardModal();
   closeSearchModal();
   closeCollectionModal();
 });
@@ -1079,6 +1139,18 @@ if (els.searchModal) {
   els.searchModal.addEventListener("click", (event) => {
     if (event.target === els.searchModal) {
       closeSearchModal();
+    }
+  });
+}
+
+if (els.deckCardModalCloseBtn) {
+  els.deckCardModalCloseBtn.addEventListener("click", closeDeckCardModal);
+}
+
+if (els.deckCardModal) {
+  els.deckCardModal.addEventListener("click", (event) => {
+    if (event.target === els.deckCardModal) {
+      closeDeckCardModal();
     }
   });
 }
@@ -1339,35 +1411,27 @@ function renderDeckCards() {
       if (card) setCommanderFromDeckCard(card);
     });
   }
+  // Auch bei Karten, die schon im Deck liegen, führt der Klick aufs Bild
+  // in dieselbe Detailansicht wie bei den Suchtreffern.
   for (const btn of els.deckCards.querySelectorAll("button[data-version]")) {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const card = find(btn.dataset.version);
-      if (card) openDeckVersionPicker(card);
+      if (!card) {
+        return;
+      }
+      setDeckStatus(`Lade ${card.name}...`, "muted");
+      try {
+        await selectDeckSearchCard(
+          await fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(card.id)}`)
+        );
+      } catch (error) {
+        setDeckStatus(`Karte konnte nicht geladen werden: ${error.message}`, "err");
+      }
     });
   }
 }
 
-// Versionswechsel im Deck, genau wie in der Collection: Die alte
-// Ausgabe wird durch die neue ersetzt, die Menge bleibt erhalten.
-async function openDeckVersionPicker(card) {
-  setDeckStatus(`Lade Versionen von ${card.name}...`, "muted");
-  try {
-    const full = await fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(card.id)}`);
-    const prints = await loadPrintHistory(full);
-    if (prints.length < 2) {
-      setDeckStatus(`Von ${card.name} gibt es nur diesen einen Print.`, "muted");
-      return;
-    }
-    state.deckVersionCard = card;
-    state.searchPrints = prints;
-    state.searchSelection = full;
-    openVersionModal("deck");
-    setDeckStatus(`${prints.length} Versionen von ${card.name}.`, "ok");
-  } catch (error) {
-    setDeckStatus(`Versionen konnten nicht geladen werden: ${error.message}`, "err");
-  }
-}
-
+// Tauscht die Ausgabe einer Karte im Deck. Die Menge bleibt erhalten.
 async function applyDeckVersion(print) {
   const previous = state.deckVersionCard;
   if (!previous || !state.activeDeck) {
@@ -1399,6 +1463,88 @@ async function setCommanderFromDeckCard(card) {
   }
 }
 
+const commanderCardCache = new Map();
+
+async function loadCommanderCard(id) {
+  if (!commanderCardCache.has(id)) {
+    commanderCardCache.set(
+      id,
+      fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(id)}`).catch((error) => {
+        commanderCardCache.delete(id);
+        throw error;
+      })
+    );
+  }
+  return commanderCardCache.get(id);
+}
+
+const DEFAULT_DECK_QUERIES = [
+  { query: "t:legendary t:creature", label: "legendary creature" },
+  { query: "c:g t:creature mv<=3", label: "grün, klein" },
+  { query: 'o:"draw a card"', label: "draw a card" }
+];
+
+function renderDeckQueries(entries, note) {
+  els.deckQueryBank.innerHTML = entries
+    .map(
+      (entry) =>
+        `<button type="button" class="query-pill" data-deck-query="${escapeHtml(entry.query)}" title="${escapeHtml(
+          entry.query
+        )}">${escapeHtml(entry.label)}</button>`
+    )
+    .join("");
+
+  for (const button of els.deckQueryBank.querySelectorAll("[data-deck-query]")) {
+    button.addEventListener("click", () => {
+      els.deckSearchInput.value = button.dataset.deckQuery || "";
+      runDeckSearch();
+    });
+  }
+
+  if (els.deckQueryNote) {
+    els.deckQueryNote.textContent = note;
+  }
+}
+
+// Die Vorschläge richten sich nach dem Commander: Ein Deck darf nur
+// Karten seiner Farbidentität enthalten, deshalb steckt id<= in jeder
+// Abfrage. Dazu kommt sein Kreaturentyp als Stammes-Vorschlag.
+async function updateDeckQueries() {
+  const commander = state.activeDeck?.commander;
+
+  if (!commander) {
+    state.commanderCard = null;
+    renderDeckQueries(DEFAULT_DECK_QUERIES, "Klick auf eine Karte öffnet ihre Details. Mit einem Commander passen sich die Vorschläge an.");
+    return;
+  }
+
+  try {
+    const card = await loadCommanderCard(commander.id);
+    state.commanderCard = card;
+
+    const letters = (card.color_identity || []).join("").toLowerCase();
+    const identity = letters ? `id<=${letters}` : "id:colorless";
+    const label = letters ? letters.toUpperCase() : "farblos";
+
+    const entries = [
+      { query: `${identity} t:creature`, label: `Kreaturen ${label}` },
+      { query: `${identity} t:instant or ${identity} t:sorcery`, label: `Spells ${label}` },
+      { query: `${identity} o:"draw a card"`, label: "Kartenziehen" },
+      { query: `${identity} o:"add {c}" t:land`, label: "Länder" }
+    ];
+
+    // Kreaturentypen stehen hinter dem Gedankenstrich der Typzeile.
+    const subtypes = (card.type_line || "").split("—")[1]?.trim().split(/\s+/) || [];
+    if (subtypes.length) {
+      entries.splice(1, 0, { query: `${identity} t:${subtypes[0].toLowerCase()}`, label: subtypes[0] });
+    }
+
+    renderDeckQueries(entries, `Vorschläge passend zu ${commander.name} (${label}).`);
+  } catch {
+    renderDeckQueries(DEFAULT_DECK_QUERIES, "Klick auf eine Karte öffnet ihre Details.");
+  }
+}
+
 function renderDeckEditor() {
   if (!state.activeDeck) {
     return;
@@ -1406,6 +1552,7 @@ function renderDeckEditor() {
   els.deckNameInput.value = state.activeDeck.name;
   renderCommanderSlot();
   renderDeckCards();
+  updateDeckQueries();
 }
 
 function applyDeckResult(result) {
@@ -1512,6 +1659,50 @@ async function setCommander(card) {
   }
 }
 
+function renderDeckCardDetails() {
+  els.deckCardDetails.innerHTML = createDetailsHtml(state.deckSelection, state.deckPrints, "deck");
+  bindDetailsEvents(els.deckCardDetails, "deck");
+}
+
+function openDeckCardModal() {
+  els.deckCardModal.classList.add("open");
+  els.deckCardModal.setAttribute("aria-hidden", "false");
+}
+
+function closeDeckCardModal() {
+  els.deckCardModal.classList.remove("open");
+  els.deckCardModal.setAttribute("aria-hidden", "true");
+}
+
+// Dieselbe Detailansicht wie in der Collection, nur legt der Knopf die
+// Karte ins Deck statt in die Collection.
+async function selectDeckSearchCard(card) {
+  const requestId = ++selectionCounters.deck;
+
+  state.deckSelection = card;
+  state.deckFaceIndex = 0;
+  state.deckPrints = [];
+  renderDeckCardDetails();
+  openDeckCardModal();
+  setDeckStatus(`Lade Versionshistorie für ${card.name}...`, "muted");
+
+  try {
+    const prints = await loadPrintHistory(card);
+    if (requestId !== selectionCounters.deck) {
+      return;
+    }
+    state.deckPrints = prints;
+    renderDeckCardDetails();
+    setDeckStatus(`Karte geladen: ${card.name}`, "ok");
+  } catch (error) {
+    if (requestId !== selectionCounters.deck) {
+      return;
+    }
+    renderDeckCardDetails();
+    setDeckStatus(`Versionshistorie konnte nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
 function renderDeckSearchResults() {
   const results = state.deckResults;
   els.deckSearchCount.textContent = `${results.length} ${results.length === 1 ? "card" : "cards"}`;
@@ -1527,7 +1718,7 @@ function renderDeckSearchResults() {
         .map((card) => {
           const preview = getCardPreviewUrl(card);
           return `
-            <button type="button" class="search-tile" data-add="${escapeHtml(card.id)}" title="${escapeHtml(card.name)} ins Deck legen">
+            <button type="button" class="search-tile" data-add="${escapeHtml(card.id)}" title="Details zu ${escapeHtml(card.name)}">
               <span class="tile-frame">
                 ${
                   preview
@@ -1546,7 +1737,7 @@ function renderDeckSearchResults() {
   for (const tile of els.deckSearchResults.querySelectorAll("button[data-add]")) {
     tile.addEventListener("click", () => {
       const card = state.deckResults.find((entry) => entry.id === tile.dataset.add);
-      if (card) addCardToDeck(card);
+      if (card) selectDeckSearchCard(card);
     });
   }
 }
@@ -1888,12 +2079,6 @@ els.deckSearchInput.addEventListener("keydown", (event) => {
 els.quickAddBtn.addEventListener("click", quickAdd);
 els.quickAddInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") quickAdd();
-});
-els.deckQueryButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    els.deckSearchInput.value = button.dataset.deckQuery || "";
-    runDeckSearch();
-  });
 });
 
 els.authTabs.forEach((tab) => {

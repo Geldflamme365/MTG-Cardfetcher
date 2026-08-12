@@ -138,16 +138,24 @@ one side wider, the way you would with two windows next to each other. The
 width is remembered for next time. You can also move it with the arrow keys.
 
 - **Search** takes plain names or full Scryfall syntax like `c:g t:creature
-  mv<=3`. Click a result and it goes into the deck.
+  mv<=3`. Click a result to see the card up close, then add it from there.
+- The suggestion buttons above the search follow your commander. A Commander
+  deck may only hold cards in the commander's colours, so every suggestion
+  carries that filter, and the commander's creature type is offered as a
+  tribal search.
 - **Quick Add** sits in the deck window. Type a card name and it takes the best
   match, even if you spell it a bit wrong.
 - Every card row has `-` and `+` for the number of copies, a star to make that
   card the commander, and `X` to take it out. Going below one copy removes the
   card.
-- Click the picture of a card to change its printing. That works for the cards
-  in the list and for the commander. It opens the same version window as the
-  collection, and the card keeps its number of copies. For the commander the
-  artwork in the overview changes along with it.
+- Click the picture of a card to open the same detail view the collection has:
+  the card up close, its rules text and all its printings. The only difference
+  is the button, which adds the card to the deck or takes it out instead of
+  touching your collection. This works for search results and for cards
+  already in the deck.
+- Changing the printing there swaps the card in the deck and keeps the number
+  of copies. Clicking the commander's picture goes straight to its printings,
+  and the artwork in the overview changes along with it.
 - A card made commander leaves the card list, the way the Commander rules put
   it apart from the rest of the deck. It still counts towards the deck size.
 

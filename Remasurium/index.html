@@ -259,13 +259,8 @@
                 <button id="deckSearchBtn" type="button">Suchen</button>
               </div>
 
-              <div class="query-bank">
-                <button type="button" class="query-pill" data-deck-query="t:legendary t:creature">legendary creature</button>
-                <button type="button" class="query-pill" data-deck-query="c:g t:creature mv&lt;=3">grün, klein</button>
-                <button type="button" class="query-pill" data-deck-query="o:&quot;draw a card&quot;">draw a card</button>
-              </div>
-
-              <p class="small-note">Klick auf eine Karte legt sie ins Deck.</p>
+              <div id="deckQueryBank" class="query-bank"></div>
+              <p class="small-note" id="deckQueryNote">Klick auf eine Karte öffnet ihre Details.</p>
 
               <div id="deckSearchResults" class="results"></div>
             </div>
@@ -468,6 +463,16 @@
         <button id="modalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
       </div>
       <div id="searchDetails" class="modal-body muted">Noch keine Karte ausgewählt.</div>
+    </div>
+  </div>
+
+  <div id="deckCardModal" class="modal" aria-hidden="true">
+    <div class="modal-dialog window" role="dialog" aria-modal="true" aria-label="Kartendetails">
+      <div class="title-bar">
+        <span>card details</span>
+        <button id="deckCardModalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
+      </div>
+      <div id="deckCardDetails" class="modal-body muted">Noch keine Karte ausgewählt.</div>
     </div>
   </div>
 
