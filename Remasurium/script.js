@@ -13,6 +13,12 @@ const state = {
   user: null
 };
 
+// Laufende Nummer je Ansicht, um veraltete Antworten zu erkennen.
+const selectionCounters = {
+  search: 0,
+  collection: 0
+};
+
 const els = {
   status: document.getElementById("status"),
   routeAddress: document.getElementById("routeAddress"),
@@ -219,8 +225,66 @@ function closeCollectionModal() {
   els.collectionModal.setAttribute("aria-hidden", "true");
 }
 
+// Scryfall bittet um 50 bis 100 ms Abstand zwischen Anfragen. Ohne
+// Bremse laufen schnelle Klicks in ein 429, und die Versionsliste bleibt
+// leer, obwohl es Versionen gibt. Darum laufen alle Aufrufe nacheinander
+// durch diese Warteschlange.
+const SCRYFALL_MIN_GAP_MS = 120;
+const SCRYFALL_MAX_RETRIES = 3;
+
+let scryfallQueue = Promise.resolve();
+let lastScryfallCall = 0;
+
+function queueScryfall(task) {
+  const run = scryfallQueue.then(async () => {
+    const wait = SCRYFALL_MIN_GAP_MS - (Date.now() - lastScryfallCall);
+    if (wait > 0) {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    try {
+      return await task();
+    } finally {
+      lastScryfallCall = Date.now();
+    }
+  });
+
+  // Der Fehler wird beim Aufrufer behandelt, die Kette darf daran nicht
+  // zerbrechen.
+  scryfallQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
+async function scryfallFetch(url, options = {}, attempt = 0) {
+  let response;
+
+  try {
+    response = await queueScryfall(() => fetch(url, options));
+  } catch (error) {
+    // Abgebrochene Verbindung, kein HTTP-Fehler. Kommt bei wackligem
+    // WLAN vor und darf nicht sofort als "keine Versionen" enden.
+    if (attempt < SCRYFALL_MAX_RETRIES) {
+      setStatus("Verbindung zu Scryfall unterbrochen, neuer Versuch...", "muted");
+      await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 700));
+      return scryfallFetch(url, options, attempt + 1);
+    }
+    throw new Error("Scryfall ist gerade nicht erreichbar.");
+  }
+
+  if (response.status === 429 && attempt < SCRYFALL_MAX_RETRIES) {
+    const retryAfter = Number(response.headers.get("Retry-After")) || 1;
+    setStatus("Scryfall bremst gerade, versuche es gleich nochmal...", "muted");
+    await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+    return scryfallFetch(url, options, attempt + 1);
+  }
+
+  return response;
+}
+
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await scryfallFetch(url, options);
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
@@ -236,7 +300,7 @@ async function fetchRandomCard() {
 
 async function searchCards(query) {
   const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=released`;
-  const response = await fetch(url);
+  const response = await scryfallFetch(url);
   if (response.status === 404) {
     return [];
   }
@@ -280,12 +344,34 @@ async function searchCardsWithTolerance(query) {
   }
 }
 
+// Alle Prints einer Karte teilen sich dieselbe prints_search_uri, die
+// taugt also als Schluessel. Gespeichert wird das Promise, damit zwei
+// schnelle Klicks auf dieselbe Karte nur eine Anfrage ausloesen.
+const printHistoryCache = new Map();
+
 async function loadPrintHistory(card) {
   if (!card || !card.prints_search_uri) {
     return [];
   }
-  const data = await fetchJson(card.prints_search_uri);
-  return (data.data || []).slice().sort((a, b) => new Date(a.released_at) - new Date(b.released_at));
+
+  const key = card.prints_search_uri;
+
+  if (!printHistoryCache.has(key)) {
+    const request = fetchJson(key)
+      .then((data) =>
+        (data.data || []).slice().sort((a, b) => new Date(a.released_at) - new Date(b.released_at))
+      )
+      .catch((error) => {
+        // Fehlschlaege nicht behalten, sonst bleibt die Karte dauerhaft
+        // ohne Versionen.
+        printHistoryCache.delete(key);
+        throw error;
+      });
+
+    printHistoryCache.set(key, request);
+  }
+
+  return printHistoryCache.get(key);
 }
 
 function isInCollection(id) {
@@ -777,8 +863,16 @@ function renderCollectionDetails() {
 }
 
 async function selectSearchCard(card) {
+  // Jede Auswahl bekommt eine Nummer. Trifft die Antwort einer aelteren
+  // Auswahl spaeter ein, wird sie verworfen, statt die aktuelle Karte
+  // mit fremden Versionen zu ueberschreiben.
+  const requestId = ++selectionCounters.search;
+
   state.searchSelection = card;
   state.searchFaceIndex = 0;
+  // Sofort leeren, sonst zeigt die Detailansicht bis zum Eintreffen der
+  // neuen Liste noch die Versionen der vorherigen Karte an.
+  state.searchPrints = [];
   closeVersionModal();
   renderResults();
   renderSearchDetails();
@@ -786,10 +880,17 @@ async function selectSearchCard(card) {
   setStatus(`Lade Versionshistorie für ${card.name}...`, "muted");
 
   try {
-    state.searchPrints = await loadPrintHistory(card);
+    const prints = await loadPrintHistory(card);
+    if (requestId !== selectionCounters.search) {
+      return;
+    }
+    state.searchPrints = prints;
     renderSearchDetails();
     setStatus(`Karte geladen: ${card.name}`, "ok");
   } catch (error) {
+    if (requestId !== selectionCounters.search) {
+      return;
+    }
     state.searchPrints = [];
     renderSearchDetails();
     setStatus(`Versionshistorie konnte nicht geladen werden: ${error.message}`, "err");
@@ -797,8 +898,11 @@ async function selectSearchCard(card) {
 }
 
 async function selectCollectionCard(card) {
+  const requestId = ++selectionCounters.collection;
+
   state.collectionSelection = card;
   state.collectionFaceIndex = 0;
+  state.collectionPrints = [];
   closeVersionModal();
   updateCollectionPreview(card);
   renderCollection();
@@ -807,10 +911,17 @@ async function selectCollectionCard(card) {
   setStatus(`Lade Versionshistorie für ${card.name}...`, "muted");
 
   try {
-    state.collectionPrints = await loadPrintHistory(card);
+    const prints = await loadPrintHistory(card);
+    if (requestId !== selectionCounters.collection) {
+      return;
+    }
+    state.collectionPrints = prints;
     renderCollectionDetails();
     setStatus(`Collection-Karte geladen: ${card.name}`, "ok");
   } catch (error) {
+    if (requestId !== selectionCounters.collection) {
+      return;
+    }
     state.collectionPrints = [];
     renderCollectionDetails();
     setStatus(`Versionshistorie konnte nicht geladen werden: ${error.message}`, "err");
