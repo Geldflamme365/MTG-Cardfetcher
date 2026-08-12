@@ -428,15 +428,35 @@ async function handleMergeCollection(request, env, user) {
 
 const MAX_DECKS = 200;
 const MAX_DECK_CARDS = 500;
+const DECK_FORMATS = ["commander"];
+
+// Im Commander-Format ist genau ein Exemplar je Karte erlaubt. Ausnahme
+// sind Standardländer und Karten mit Relentless-Text ("A deck can have
+// any number of cards named ..."), beide kommen als unlimited herein.
+function limitQuantity(deck, card, requested) {
+  const quantity = Math.min(Math.max(Number(requested) || 1, 1), 99);
+  if (deck.format === "commander" && !card.unlimited) {
+    return 1;
+  }
+  return quantity;
+}
 
 function deckFromRow(row, cardCount = 0) {
+  // Der Commander zählt als Karte des Decks mit.
+  const total = cardCount + (row.commander_card_id ? 1 : 0);
   return {
     id: row.id,
     name: row.name,
+    format: row.format || "commander",
     commander: row.commander_card_id
-      ? { id: row.commander_card_id, name: row.commander_name, image: row.commander_image }
+      ? {
+          id: row.commander_card_id,
+          name: row.commander_name,
+          image: row.commander_image,
+          art: row.commander_art || null
+        }
       : null,
-    cardCount,
+    cardCount: total,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -448,7 +468,8 @@ function deckCardFromRow(row) {
     name: row.name,
     set_name: row.set_name,
     image: row.image,
-    quantity: row.quantity
+    quantity: row.quantity,
+    unlimited: Boolean(row.unlimited)
   };
 }
 
@@ -484,6 +505,7 @@ async function handleListDecks(env, user) {
 async function handleCreateDeck(request, env, user) {
   const body = await readJson(request);
   const name = cleanDeckName(body?.name) || "Neues Deck";
+  const format = DECK_FORMATS.includes(body?.format) ? body.format : "commander";
 
   const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM decks WHERE user_id = ?")
     .bind(user.id)
@@ -493,12 +515,12 @@ async function handleCreateDeck(request, env, user) {
   }
 
   const now = new Date().toISOString();
-  const deck = { id: crypto.randomUUID(), name, created_at: now, updated_at: now };
+  const deck = { id: crypto.randomUUID(), name, format, created_at: now, updated_at: now };
 
   await env.DB.prepare(
-    "INSERT INTO decks (id, user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO decks (id, user_id, name, format, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
   )
-    .bind(deck.id, user.id, deck.name, now, now)
+    .bind(deck.id, user.id, deck.name, format, now, now)
     .run();
 
   return json({ deck: deckFromRow(deck) }, 201);
@@ -548,14 +570,24 @@ async function handleUpdateDeck(request, env, user, deckId) {
   // commander: null entfernt ihn, ein Objekt setzt ihn.
   if (body.commander !== undefined) {
     if (body.commander === null) {
-      updates.push("commander_card_id = NULL", "commander_name = NULL", "commander_image = NULL");
+      updates.push(
+        "commander_card_id = NULL",
+        "commander_name = NULL",
+        "commander_image = NULL",
+        "commander_art = NULL"
+      );
     } else {
       const card = cardFromInput(body.commander);
       if (!card) {
         return fail("Commander-Daten unvollständig.");
       }
-      updates.push("commander_card_id = ?", "commander_name = ?", "commander_image = ?");
-      values.push(card.id, card.name, card.image);
+      updates.push(
+        "commander_card_id = ?",
+        "commander_name = ?",
+        "commander_image = ?",
+        "commander_art = ?"
+      );
+      values.push(card.id, card.name, card.image, body.commander.art ? String(body.commander.art).slice(0, 500) : null);
       // Der Commander gehört nicht zusätzlich in die Kartenliste.
       await env.DB.prepare("DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ?")
         .bind(deckId, card.id)
@@ -599,7 +631,8 @@ async function handlePutDeckCard(request, env, user, deckId, cardId) {
     return fail("Kartendaten unvollständig.");
   }
 
-  const quantity = Math.min(Math.max(Number(body?.quantity) || 1, 1), 99);
+  const unlimited = Boolean(body?.unlimited);
+  const quantity = limitQuantity(deck, { unlimited }, body?.quantity);
 
   const totals = await env.DB.prepare(
     "SELECT COALESCE(SUM(quantity), 0) AS n FROM deck_cards WHERE deck_id = ? AND card_id <> ?"
@@ -612,15 +645,25 @@ async function handlePutDeckCard(request, env, user, deckId, cardId) {
   }
 
   await env.DB.prepare(
-    `INSERT INTO deck_cards (deck_id, card_id, name, set_name, image, quantity, added_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO deck_cards (deck_id, card_id, name, set_name, image, quantity, unlimited, added_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (deck_id, card_id) DO UPDATE SET
        name = excluded.name,
        set_name = excluded.set_name,
        image = excluded.image,
-       quantity = excluded.quantity`
+       quantity = excluded.quantity,
+       unlimited = excluded.unlimited`
   )
-    .bind(deckId, card.id, card.name, card.set_name, card.image, quantity, new Date().toISOString())
+    .bind(
+      deckId,
+      card.id,
+      card.name,
+      card.set_name,
+      card.image,
+      quantity,
+      unlimited ? 1 : 0,
+      new Date().toISOString()
+    )
     .run();
 
   await touchDeck(env, deckId);
@@ -663,18 +706,21 @@ async function handleMergeDecks(request, env, user) {
     const deckId = crypto.randomUUID();
     const stamp = new Date(now - index * 1000).toISOString();
     const commander = raw?.commander ? cardFromInput(raw.commander) : null;
+    const format = DECK_FORMATS.includes(raw?.format) ? raw.format : "commander";
 
     await env.DB.prepare(
-      `INSERT INTO decks (id, user_id, name, commander_card_id, commander_name, commander_image, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO decks (id, user_id, name, format, commander_card_id, commander_name, commander_image, commander_art, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         deckId,
         user.id,
         name,
+        format,
         commander?.id || null,
         commander?.name || null,
         commander?.image || null,
+        raw?.commander?.art ? String(raw.commander.art).slice(0, 500) : null,
         stamp,
         stamp
       )
@@ -684,15 +730,19 @@ async function handleMergeDecks(request, env, user) {
     const cards = (Array.isArray(raw?.cards) ? raw.cards : [])
       .map((entry) => {
         const card = cardFromInput(entry);
-        return card ? { ...card, quantity: Math.min(Math.max(Number(entry?.quantity) || 1, 1), 99) } : null;
+        if (!card) {
+          return null;
+        }
+        const unlimited = Boolean(entry?.unlimited);
+        return { ...card, unlimited, quantity: limitQuantity({ format }, { unlimited }, entry?.quantity) };
       })
       .filter(Boolean)
       .slice(0, MAX_DECK_CARDS);
 
     if (cards.length) {
       const statement = env.DB.prepare(
-        `INSERT INTO deck_cards (deck_id, card_id, name, set_name, image, quantity, added_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO deck_cards (deck_id, card_id, name, set_name, image, quantity, unlimited, added_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (deck_id, card_id) DO NOTHING`
       );
 
@@ -704,7 +754,8 @@ async function handleMergeDecks(request, env, user) {
             card.name,
             card.set_name,
             card.image,
-            Math.min(Math.max(Number(card.quantity) || 1, 1), 99),
+            card.quantity,
+            card.unlimited ? 1 : 0,
             new Date(now - i * 1000).toISOString()
           )
         )

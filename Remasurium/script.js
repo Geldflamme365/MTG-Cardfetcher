@@ -15,7 +15,8 @@ const state = {
   decks: [],
   activeDeck: null,
   activeDeckCards: [],
-  deckResults: []
+  deckResults: [],
+  deckVersionCard: null
 };
 
 const deckStore = createDeckStore({ isLoggedIn: () => Boolean(state.user) });
@@ -62,7 +63,10 @@ const els = {
   deckCount: document.getElementById("deckCount"),
   deckStatus: document.getElementById("deckStatus"),
   newDeckName: document.getElementById("newDeckName"),
+  newDeckFormat: document.getElementById("newDeckFormat"),
   createDeckBtn: document.getElementById("createDeckBtn"),
+  deckLayout: document.querySelector(".deck-layout"),
+  deckSplitter: document.getElementById("deckSplitter"),
   deckSearchInput: document.getElementById("deckSearchInput"),
   deckSearchBtn: document.getElementById("deckSearchBtn"),
   deckSearchResults: document.getElementById("deckSearchResults"),
@@ -800,8 +804,8 @@ function renderVersionModal() {
     return;
   }
 
-  const card = context === "search" ? state.searchSelection : state.collectionSelection;
-  const prints = context === "search" ? state.searchPrints : state.collectionPrints;
+  const card = context === "collection" ? state.collectionSelection : state.searchSelection;
+  const prints = context === "collection" ? state.collectionPrints : state.searchPrints;
 
   if (els.versionModalTitle) {
     els.versionModalTitle.textContent = card ? `versions - ${card.name.toLowerCase()}` : "card versions";
@@ -848,7 +852,10 @@ function renderVersionModal() {
         const selectedPrint = await fetchJson(`https://api.scryfall.com/cards/${tile.dataset.print}`);
         // Nach der Wahl schliesst sich das Fenster wieder, darum kuemmert
         // sich selectSearchCard bzw. selectCollectionCard.
-        if (targetContext === "search") {
+        if (targetContext === "deck") {
+          closeVersionModal();
+          await applyDeckVersion(selectedPrint);
+        } else if (targetContext === "search") {
           await selectSearchCard(selectedPrint);
         } else {
           const previousId = state.collectionSelection?.id;
@@ -1105,12 +1112,34 @@ function setDeckStatus(text, type = "muted") {
   els.deckStatus.className = `status ${type}`;
 }
 
+// Karten, von denen ein Deck beliebig viele haben darf. Das sind
+// Standardländer und die Relentless-Karten. Statt dafür pro Karte den
+// Scryfall-Tag abzufragen, wird der Regeltext geprüft: Genau diese
+// Karten tragen den Satz "A deck can have any number of cards named".
+// Das spart eine Anfrage je Karte und funktioniert auch offline.
+function allowsAnyNumber(card) {
+  const type = card.type_line || "";
+  if (/\bBasic\b/i.test(type) && /\bLand\b/i.test(type)) {
+    return true;
+  }
+
+  const text = [card.oracle_text, ...(card.card_faces || []).map((face) => face.oracle_text)]
+    .filter(Boolean)
+    .join(" ");
+  return /any number of cards named/i.test(text);
+}
+
+function getCardArtUrl(card) {
+  return card.image_uris?.art_crop || card.card_faces?.[0]?.image_uris?.art_crop || null;
+}
+
 function deckCardFromScryfall(card) {
   return {
     id: card.id,
     name: card.name,
     set_name: card.set_name ?? null,
-    image: getCardPreviewUrl(card) || card.image || null
+    image: getCardPreviewUrl(card) || card.image || null,
+    unlimited: allowsAnyNumber(card)
   };
 }
 
@@ -1128,8 +1157,10 @@ function renderDeckList() {
       (deck) => `
         <button type="button" class="deck-tile" data-deck="${escapeHtml(deck.id)}" title="${escapeHtml(deck.name)}">
           ${
-            deck.commander?.image
-              ? `<img src="${escapeHtml(deck.commander.image)}" alt="Commander ${escapeHtml(deck.commander.name || "")}" loading="lazy" />`
+            deck.commander?.art || deck.commander?.image
+              ? `<img class="${deck.commander.art ? "" : "is-full-card"}" src="${escapeHtml(
+                  deck.commander.art || deck.commander.image
+                )}" alt="Artwork von ${escapeHtml(deck.commander.name || "")}" loading="lazy" />`
               : `<span class="deck-tile-empty">Kein Commander gewählt</span>`
           }
           <span class="deck-tile-body">
@@ -1194,7 +1225,10 @@ function renderCommanderSlot() {
 
 function renderDeckCards() {
   const cards = state.activeDeckCards;
-  const total = cards.reduce((sum, card) => sum + card.quantity, 0);
+  const singleton = (state.activeDeck?.format || "commander") === "commander";
+  // Der Commander zählt als Karte des Decks mit.
+  const total =
+    cards.reduce((sum, card) => sum + card.quantity, 0) + (state.activeDeck?.commander ? 1 : 0);
   els.deckTotal.textContent = `${total} ${total === 1 ? "Karte" : "Karten"}`;
 
   if (!cards.length) {
@@ -1218,7 +1252,12 @@ function renderDeckCards() {
           <span class="deck-card-actions">
             <button type="button" data-less="${escapeHtml(card.id)}" title="Eine weniger" aria-label="Eine weniger">-</button>
             <span class="quantity">${card.quantity}</span>
-            <button type="button" data-more="${escapeHtml(card.id)}" title="Eine mehr" aria-label="Eine mehr">+</button>
+            <button type="button" data-more="${escapeHtml(card.id)}" title="${
+              singleton && !card.unlimited
+                ? "Im Commander ist nur ein Exemplar erlaubt"
+                : "Eine mehr"
+            }" aria-label="Eine mehr"${singleton && !card.unlimited ? " disabled" : ""}>+</button>
+            <button type="button" data-version="${escapeHtml(card.id)}" title="Version wechseln" aria-label="Version wechseln">⇄</button>
             <button type="button" data-commander="${escapeHtml(card.id)}" title="Als Commander festlegen" aria-label="Als Commander festlegen">★</button>
             <button type="button" data-remove="${escapeHtml(card.id)}" title="Aus dem Deck entfernen" aria-label="Entfernen">X</button>
           </span>
@@ -1250,8 +1289,66 @@ function renderDeckCards() {
   for (const btn of els.deckCards.querySelectorAll("button[data-commander]")) {
     btn.addEventListener("click", () => {
       const card = find(btn.dataset.commander);
-      if (card) setCommander(card);
+      if (card) setCommanderFromDeckCard(card);
     });
+  }
+  for (const btn of els.deckCards.querySelectorAll("button[data-version]")) {
+    btn.addEventListener("click", () => {
+      const card = find(btn.dataset.version);
+      if (card) openDeckVersionPicker(card);
+    });
+  }
+}
+
+// Versionswechsel im Deck, genau wie in der Collection: Die alte
+// Ausgabe wird durch die neue ersetzt, die Menge bleibt erhalten.
+async function openDeckVersionPicker(card) {
+  setDeckStatus(`Lade Versionen von ${card.name}...`, "muted");
+  try {
+    const full = await fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(card.id)}`);
+    const prints = await loadPrintHistory(full);
+    if (prints.length < 2) {
+      setDeckStatus(`Von ${card.name} gibt es nur diesen einen Print.`, "muted");
+      return;
+    }
+    state.deckVersionCard = card;
+    state.searchPrints = prints;
+    state.searchSelection = full;
+    openVersionModal("deck");
+    setDeckStatus(`${prints.length} Versionen von ${card.name}.`, "ok");
+  } catch (error) {
+    setDeckStatus(`Versionen konnten nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
+async function applyDeckVersion(print) {
+  const previous = state.deckVersionCard;
+  if (!previous || !state.activeDeck) {
+    return;
+  }
+
+  try {
+    const entry = deckCardFromScryfall(print);
+    await deckStore.putCard(state.activeDeck.id, entry, previous.quantity);
+    if (previous.id !== entry.id) {
+      applyDeckResult(await deckStore.removeCard(state.activeDeck.id, previous.id));
+    } else {
+      applyDeckResult(await deckStore.get(state.activeDeck.id));
+    }
+    setDeckStatus(`${entry.name}: Version ${print.set_name || "gewechselt"}.`, "ok");
+  } catch (error) {
+    setDeckStatus(`Version konnte nicht gewechselt werden: ${error.message}`, "err");
+  }
+}
+
+async function setCommanderFromDeckCard(card) {
+  // Für das Artwork in der Übersicht wird die vollständige Karte
+  // gebraucht, die Deckzeile kennt nur das normale Bild.
+  try {
+    const full = await fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(card.id)}`);
+    await setCommander({ ...card, art: getCardArtUrl(full) });
+  } catch {
+    await setCommander(card);
   }
 }
 
@@ -1285,9 +1382,10 @@ async function openDeck(deckId) {
 
 async function createDeck() {
   const name = els.newDeckName.value.trim();
+  const format = els.newDeckFormat.value || "commander";
   setDeckStatus("Lege Deck an...", "muted");
   try {
-    const deck = await deckStore.create(name);
+    const deck = await deckStore.create(name, format);
     els.newDeckName.value = "";
     await refreshDecks();
     setDeckStatus(`Deck "${deck.name}" angelegt.`, "ok");
@@ -1356,7 +1454,9 @@ async function removeDeckCard(cardId) {
 async function setCommander(card) {
   if (!state.activeDeck) return;
   try {
-    const commander = card ? { id: card.id, name: card.name, image: card.image ?? null } : null;
+    const commander = card
+      ? { id: card.id, name: card.name, image: card.image ?? null, art: card.art ?? null }
+      : null;
     applyDeckResult(await deckStore.update(state.activeDeck.id, { commander }));
     await refreshDecks();
     setDeckStatus(card ? `${card.name} ist jetzt Commander.` : "Commander entfernt.", "ok");
@@ -1668,6 +1768,60 @@ async function initAuth() {
   } catch {
     setAuthStatus("Offline-Modus: Die Collection bleibt in diesem Browser.", "muted");
   }
+}
+
+// Trennlinie zwischen Such- und Deckfenster. Die Breite wird als Anteil
+// gespeichert, damit sie beim naechsten Besuch wieder stimmt.
+const SPLIT_KEY = "remasurium.deckSplit";
+const SPLIT_MIN = 25;
+const SPLIT_MAX = 75;
+
+function applyDeckSplit(percent) {
+  const clamped = Math.min(Math.max(percent, SPLIT_MIN), SPLIT_MAX);
+  els.deckLayout.style.setProperty("--deck-split", `${clamped}%`);
+  return clamped;
+}
+
+function startSplitDrag(startEvent) {
+  startEvent.preventDefault();
+  document.body.classList.add("is-splitting");
+
+  const move = (event) => {
+    const box = els.deckLayout.getBoundingClientRect();
+    const x = (event.touches ? event.touches[0].clientX : event.clientX) - box.left;
+    applyDeckSplit((x / box.width) * 100);
+  };
+
+  const stop = () => {
+    document.body.classList.remove("is-splitting");
+    window.removeEventListener("mousemove", move);
+    window.removeEventListener("mouseup", stop);
+    window.removeEventListener("touchmove", move);
+    window.removeEventListener("touchend", stop);
+    const current = parseFloat(els.deckLayout.style.getPropertyValue("--deck-split")) || 52;
+    localStorage.setItem(SPLIT_KEY, String(current));
+  };
+
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", stop);
+  window.addEventListener("touchmove", move, { passive: false });
+  window.addEventListener("touchend", stop);
+}
+
+if (els.deckSplitter) {
+  els.deckSplitter.addEventListener("mousedown", startSplitDrag);
+  els.deckSplitter.addEventListener("touchstart", startSplitDrag, { passive: false });
+  // Mit den Pfeiltasten laesst sich die Linie ebenfalls verschieben.
+  els.deckSplitter.addEventListener("keydown", (event) => {
+    const step = event.key === "ArrowLeft" ? -4 : event.key === "ArrowRight" ? 4 : 0;
+    if (!step) {
+      return;
+    }
+    event.preventDefault();
+    const current = parseFloat(els.deckLayout.style.getPropertyValue("--deck-split")) || 52;
+    localStorage.setItem(SPLIT_KEY, String(applyDeckSplit(current + step)));
+  });
+  applyDeckSplit(Number(localStorage.getItem(SPLIT_KEY)) || 52);
 }
 
 els.createDeckBtn.addEventListener("click", createDeck);

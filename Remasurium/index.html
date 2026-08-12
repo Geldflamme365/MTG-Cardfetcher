@@ -222,6 +222,19 @@
               <button id="createDeckBtn" type="button">Erstellen</button>
             </div>
 
+            <label class="field-label" for="newDeckFormat">Format</label>
+            <select id="newDeckFormat">
+              <option value="commander" selected>Commander</option>
+              <option value="standard" disabled>Standard (in Arbeit)</option>
+              <option value="modern" disabled>Modern (in Arbeit)</option>
+              <option value="pauper" disabled>Pauper (in Arbeit)</option>
+            </select>
+            <p class="small-note">
+              Bisher gibt es nur Commander: eine Karte je Exemplar, ausser bei
+              Standardländern und Karten wie Relentless Rats. An den übrigen
+              Formaten wird noch gearbeitet.
+            </p>
+
             <div class="status-wrap">
               <span class="field-label">Status</span>
               <div id="deckStatus" class="status muted">Bereit.</div>
@@ -257,6 +270,8 @@
               <div id="deckSearchResults" class="results"></div>
             </div>
           </article>
+
+          <div id="deckSplitter" class="deck-splitter" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Breite der Fenster anpassen" title="Ziehen, um die Breite zu ändern"></div>
 
           <article class="window panel">
             <div class="panel-title-bar panel-title-bar-wide">

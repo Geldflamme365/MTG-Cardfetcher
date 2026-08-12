@@ -54,7 +54,7 @@ export const api = {
   deleteCard: (cardId) => call(`/collection/${encodeURIComponent(cardId)}`, { method: "DELETE" }),
 
   listDecks: () => call("/decks"),
-  createDeck: (name) => call("/decks", { method: "POST", body: { name } }),
+  createDeck: (name, format) => call("/decks", { method: "POST", body: { name, format } }),
   getDeck: (id) => call(`/decks/${encodeURIComponent(id)}`),
   updateDeck: (id, changes) => call(`/decks/${encodeURIComponent(id)}`, { method: "PATCH", body: changes }),
   deleteDeck: (id) => call(`/decks/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -62,7 +62,13 @@ export const api = {
   putDeckCard: (id, card, quantity) =>
     call(`/decks/${encodeURIComponent(id)}/cards/${encodeURIComponent(card.id)}`, {
       method: "PUT",
-      body: { name: card.name, set_name: card.set_name, image: card.image, quantity }
+      body: {
+        name: card.name,
+        set_name: card.set_name,
+        image: card.image,
+        unlimited: Boolean(card.unlimited),
+        quantity
+      }
     }),
   deleteDeckCard: (id, cardId) =>
     call(`/decks/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`, { method: "DELETE" })

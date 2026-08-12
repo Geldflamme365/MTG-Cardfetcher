@@ -120,22 +120,34 @@ cannot be guessed by trying many times.
 
 ## Decks
 
-The Decks tab holds every deck you build. Each deck has a name and can have a
-commander. The commander's card picture is what you see on the deck in the
-overview, so you can tell your decks apart at a glance.
+The Decks tab holds every deck you build. Each deck has a name, a format and
+can have a commander. The commander's artwork is what you see on the deck in
+the overview, so you can tell your decks apart at a glance.
+
+Right now the only format is Commander. The others are in the list but turned
+off, because the rules behind them are not written yet.
+
+In a Commander deck you may only keep one copy of a card. Two kinds of cards
+are free of that rule: basic lands, and cards that say "A deck can have any
+number of cards named ...", like Relentless Rats. For those the `+` button
+stays usable. The commander itself counts as one of the cards in the deck.
 
 Click a deck to open the editor. It has two windows side by side: card search
-on the left, the deck itself on the right.
+on the left, the deck itself on the right. Drag the bar between them to make
+one side wider, the way you would with two windows next to each other. The
+width is remembered for next time. You can also move it with the arrow keys.
 
 - **Search** takes plain names or full Scryfall syntax like `c:g t:creature
   mv<=3`. Click a result and it goes into the deck.
 - **Quick Add** sits in the deck window. Type a card name and it takes the best
   match, even if you spell it a bit wrong.
-- Every card row has `-` and `+` for the number of copies, a star to make that
-  card the commander, and `X` to take it out. Going below one copy removes the
-  card.
-- The commander is not counted in the card list. That follows the Commander
-  rules, where it sits apart from the rest of the deck.
+- Every card row has `-` and `+` for the number of copies, `⇄` to swap the
+  printing, a star to make that card the commander, and `X` to take it out.
+  Going below one copy removes the card.
+- `⇄` opens the same version window as the collection. Pick another printing
+  and the card in the deck is swapped for it, keeping the number of copies.
+- A card made commander leaves the card list, the way the Commander rules put
+  it apart from the rest of the deck. It still counts towards the deck size.
 
 Decks work without an account too. They then live in your browser and move up
 to your account the first time you log in.

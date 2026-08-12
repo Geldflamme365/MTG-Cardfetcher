@@ -388,7 +388,8 @@ a:visited {
   margin-top: 8px;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 40px;
   padding: 8px 10px;
@@ -398,6 +399,15 @@ input {
   border-color: #8b867c #ffffff #ffffff #8b867c;
   box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.2);
   font: inherit;
+}
+
+select {
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+select option:disabled {
+  color: #8a857b;
 }
 
 input::placeholder {
@@ -705,10 +715,35 @@ input::placeholder {
     inset -1px -1px 0 rgba(40, 6, 11, 0.85);
 }
 
+/* Die Spaltenbreite steckt in --deck-split und wird beim Ziehen der
+   Trennlinie gesetzt. */
 .deck-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, var(--deck-split, 52%)) 10px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.deck-splitter {
+  align-self: stretch;
+  min-height: 120px;
+  border: 2px solid;
+  border-color: var(--edge-light) #615d54 #615d54 var(--edge-light);
+  background:
+    repeating-linear-gradient(180deg, #efebe1 0 3px, #cbc6bc 3px 6px);
+  cursor: col-resize;
+}
+
+.deck-splitter:hover,
+.deck-splitter:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+
+/* Waehrend des Ziehens darf die Maus keine Texte markieren. */
+body.is-splitting {
+  user-select: none;
+  cursor: col-resize;
 }
 
 .deck-grid {
@@ -735,15 +770,20 @@ input::placeholder {
   filter: brightness(1.03);
 }
 
-/* Der Bildausschnitt sitzt bewusst hoch: Auf einer Magic-Karte liegt
-   das Artwork im oberen Drittel. */
 .deck-tile img {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  object-position: 50% 20%;
   background: #181126;
+}
+
+/* Liegt nur das volle Kartenbild vor, muss der Ausschnitt hoch sitzen,
+   damit die Mitte auf dem Artwork landet und nicht auf dem Textkasten.
+   Mit art_crop von Scryfall ist das nicht noetig, dort ist bereits nur
+   das Bild enthalten. */
+.deck-tile img.is-full-card {
+  object-position: 50% 4%;
 }
 
 .deck-tile-empty {
@@ -931,6 +971,11 @@ input::placeholder {
   .deck-layout,
   .details-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Untereinander gibt es nichts mehr in der Breite zu verschieben. */
+  .deck-splitter {
+    display: none;
   }
 
   .search-grid,

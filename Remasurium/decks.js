@@ -29,20 +29,31 @@ function publicDeck(deck) {
   return {
     id: deck.id,
     name: deck.name,
+    format: deck.format || "commander",
     commander: deck.commander || null,
-    cardCount: countCards(deck.cards),
+    // Der Commander zählt als Karte des Decks mit.
+    cardCount: countCards(deck.cards) + (deck.commander ? 1 : 0),
     createdAt: deck.createdAt,
     updatedAt: deck.updatedAt
   };
 }
 
-function cardEntry(card, quantity) {
+// Dieselbe Regel wie im Worker: Commander erlaubt ein Exemplar je Karte,
+// ausser bei Standardländern und Relentless-Karten.
+function limitQuantity(deck, unlimited, requested) {
+  const quantity = Math.min(Math.max(Number(requested) || 1, 1), 99);
+  return (deck.format || "commander") === "commander" && !unlimited ? 1 : quantity;
+}
+
+function cardEntry(deck, card, quantity) {
+  const unlimited = Boolean(card.unlimited);
   return {
     id: card.id,
     name: card.name,
     set_name: card.set_name ?? null,
     image: card.image ?? null,
-    quantity: Math.min(Math.max(Number(quantity) || 1, 1), 99)
+    unlimited,
+    quantity: limitQuantity(deck, unlimited, quantity)
   };
 }
 
@@ -65,6 +76,7 @@ export function createDeckStore({ isLoggedIn }) {
       const decks = loadLocal();
       return decks.map((deck) => ({
         name: deck.name,
+        format: deck.format || "commander",
         commander: deck.commander || null,
         cards: (deck.cards || []).map((card) => ({ ...card }))
       }));
@@ -84,10 +96,10 @@ export function createDeckStore({ isLoggedIn }) {
         .map(publicDeck);
     },
 
-    async create(name) {
+    async create(name, format = "commander") {
       const clean = String(name || "").trim().slice(0, 80) || "Neues Deck";
       if (isLoggedIn()) {
-        return (await api.createDeck(clean)).deck;
+        return (await api.createDeck(clean, format)).deck;
       }
 
       const decks = loadLocal();
@@ -95,6 +107,7 @@ export function createDeckStore({ isLoggedIn }) {
       const deck = {
         id: `local-${crypto.randomUUID()}`,
         name: clean,
+        format,
         commander: null,
         cards: [],
         createdAt: now,
@@ -130,7 +143,12 @@ export function createDeckStore({ isLoggedIn }) {
 
       if (changes.commander !== undefined) {
         deck.commander = changes.commander
-          ? { id: changes.commander.id, name: changes.commander.name, image: changes.commander.image ?? null }
+          ? {
+              id: changes.commander.id,
+              name: changes.commander.name,
+              image: changes.commander.image ?? null,
+              art: changes.commander.art ?? null
+            }
           : null;
         // Gleiche Regel wie im Backend: der Commander steht nicht
         // zusätzlich in der Kartenliste.
@@ -161,7 +179,7 @@ export function createDeckStore({ isLoggedIn }) {
       const deck = findLocal(decks, id);
       deck.cards = deck.cards || [];
 
-      const entry = cardEntry(card, quantity);
+      const entry = cardEntry(deck, card, quantity);
       const others = deck.cards.filter((item) => item.id !== entry.id);
       if (countCards(others) + entry.quantity > MAX_DECK_CARDS) {
         throw new Error(`Ein Deck fasst höchstens ${MAX_DECK_CARDS} Karten.`);
