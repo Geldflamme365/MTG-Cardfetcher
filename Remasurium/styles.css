@@ -670,6 +670,19 @@ input::placeholder {
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 }
 
+/* Das Suchfenster im Deckbau ist in der Breite verstellbar. Feste vier
+   Spalten würden die Karten beim Schmalerziehen zusammenquetschen, statt
+   die Spaltenzahl zu verringern. */
+#deckSearchResults .search-grid {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+/* Lange Kartennamen ohne Leerzeichen dürfen nicht am Rand abgeschnitten
+   werden. */
+.tile-caption {
+  overflow-wrap: anywhere;
+}
+
 .version-tile .tile-caption small {
   display: block;
   font-weight: 400;
