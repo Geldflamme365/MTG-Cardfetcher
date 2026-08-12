@@ -705,6 +705,180 @@ input::placeholder {
     inset -1px -1px 0 rgba(40, 6, 11, 0.85);
 }
 
+.deck-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.deck-tile {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  color: var(--ink);
+  background: linear-gradient(180deg, #ece8de, #d7d2c8);
+  border: 2px solid;
+  border-color: var(--edge-light) #615d54 #615d54 var(--edge-light);
+  cursor: pointer;
+}
+
+.deck-tile:hover {
+  filter: brightness(1.03);
+}
+
+/* Der Bildausschnitt sitzt bewusst hoch: Auf einer Magic-Karte liegt
+   das Artwork im oberen Drittel. */
+.deck-tile img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  object-position: 50% 20%;
+  background: #181126;
+}
+
+.deck-tile-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  padding: 10px;
+  color: #cdbef8;
+  text-align: center;
+  font-size: 0.8rem;
+  background: linear-gradient(180deg, rgba(40, 22, 78, 0.96), rgba(18, 9, 34, 0.96));
+}
+
+.deck-tile-body {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+}
+
+.deck-tile-body strong {
+  font-size: 0.95rem;
+}
+
+.deck-tile-body span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.deck-toolbar {
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+
+.commander-slot {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 10px;
+  border: 2px solid;
+  border-color: var(--edge-light) #8d887e #8d887e var(--edge-light);
+  background: linear-gradient(180deg, #ece8de, #d7d2c8);
+}
+
+.commander-slot img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  object-fit: cover;
+  border: 2px solid;
+  border-color: #8b867c #ffffff #ffffff #8b867c;
+}
+
+.commander-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 63 / 88;
+  color: #cdbef8;
+  font-size: 1.5rem;
+  background: #181126;
+  border: 2px solid;
+  border-color: #8b867c #ffffff #ffffff #8b867c;
+}
+
+.deck-cards {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.deck-card-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 2px solid;
+  border-color: var(--edge-light) #8d887e #8d887e var(--edge-light);
+  background: linear-gradient(180deg, #ece8de, #d7d2c8);
+}
+
+.deck-card-row img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  object-fit: cover;
+}
+
+.deck-card-name {
+  min-width: 0;
+}
+
+.deck-card-name strong {
+  display: block;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.deck-card-name span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.deck-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deck-card-actions button {
+  min-width: 30px;
+  min-height: 30px;
+  padding: 2px 7px;
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(180deg, #efebe1, #cbc6bc);
+  border: 2px solid;
+  border-color: var(--edge-light) #615d54 #615d54 var(--edge-light);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.deck-card-actions button:hover {
+  filter: brightness(1.03);
+}
+
+.deck-card-actions .quantity {
+  min-width: 26px;
+  text-align: center;
+  font-weight: 700;
+}
+
 .recovery-panel {
   margin-top: 16px;
   padding: 14px;
@@ -754,6 +928,7 @@ input::placeholder {
 @media (max-width: 980px) {
   .home-grid,
   .search-layout,
+  .deck-layout,
   .details-grid {
     grid-template-columns: 1fr;
   }

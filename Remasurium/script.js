@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { createDeckStore } from "./decks.js";
 
 const state = {
   results: [],
@@ -10,8 +11,14 @@ const state = {
   collectionFaceIndex: 0,
   versionModalContext: null,
   collection: loadCollection(),
-  user: null
+  user: null,
+  decks: [],
+  activeDeck: null,
+  activeDeckCards: [],
+  deckResults: []
 };
+
+const deckStore = createDeckStore({ isLoggedIn: () => Boolean(state.user) });
 
 // Laufende Nummer je Ansicht, um veraltete Antworten zu erkennen.
 const selectionCounters = {
@@ -46,8 +53,30 @@ const els = {
     home: document.getElementById("view-home"),
     suche: document.getElementById("view-suche"),
     collection: document.getElementById("view-collection"),
+    decks: document.getElementById("view-decks"),
     account: document.getElementById("view-account")
   },
+  deckOverview: document.getElementById("deckOverview"),
+  deckEditor: document.getElementById("deckEditor"),
+  deckList: document.getElementById("deckList"),
+  deckCount: document.getElementById("deckCount"),
+  deckStatus: document.getElementById("deckStatus"),
+  newDeckName: document.getElementById("newDeckName"),
+  createDeckBtn: document.getElementById("createDeckBtn"),
+  deckSearchInput: document.getElementById("deckSearchInput"),
+  deckSearchBtn: document.getElementById("deckSearchBtn"),
+  deckSearchResults: document.getElementById("deckSearchResults"),
+  deckSearchCount: document.getElementById("deckSearchCount"),
+  deckQueryButtons: document.querySelectorAll("[data-deck-query]"),
+  deckNameInput: document.getElementById("deckNameInput"),
+  renameDeckBtn: document.getElementById("renameDeckBtn"),
+  deleteDeckBtn: document.getElementById("deleteDeckBtn"),
+  backToDecksBtn: document.getElementById("backToDecksBtn"),
+  commanderSlot: document.getElementById("commanderSlot"),
+  deckCards: document.getElementById("deckCards"),
+  deckTotal: document.getElementById("deckTotal"),
+  quickAddInput: document.getElementById("quickAddInput"),
+  quickAddBtn: document.getElementById("quickAddBtn"),
   navLinks: document.querySelectorAll(".nav-link"),
   authStatus: document.getElementById("authStatus"),
   accountGuest: document.getElementById("accountGuest"),
@@ -130,6 +159,9 @@ function normalizeRoute(hash) {
   if (route === "collection") {
     return "collection";
   }
+  if (route === "decks") {
+    return "decks";
+  }
   if (route === "account") {
     return "account";
   }
@@ -150,6 +182,7 @@ function updateRouteChrome(route) {
     home: "scry://remasurium/home",
     suche: "scry://remasurium/search",
     collection: "scry://remasurium/collection",
+    decks: "scry://remasurium/decks",
     account: "scry://remasurium/account"
   };
   const label = labels[route] || labels.home;
@@ -173,10 +206,16 @@ function renderRoute() {
     home: "MTG Remasurium - Home",
     suche: "MTG Remasurium - Suche",
     collection: "MTG Remasurium - Collection",
+    decks: "MTG Remasurium - Decks",
     account: "MTG Remasurium - Account"
   };
 
   document.title = titleMap[route] || "MTG Remasurium";
+
+  if (route === "decks") {
+    refreshDecks();
+  }
+
   setActiveNav(route);
   updateRouteChrome(route);
   closeVersionModal();
@@ -1058,6 +1097,355 @@ if (els.collectionModal) {
   });
 }
 
+function setDeckStatus(text, type = "muted") {
+  if (!els.deckStatus) {
+    return;
+  }
+  els.deckStatus.textContent = text;
+  els.deckStatus.className = `status ${type}`;
+}
+
+function deckCardFromScryfall(card) {
+  return {
+    id: card.id,
+    name: card.name,
+    set_name: card.set_name ?? null,
+    image: getCardPreviewUrl(card) || card.image || null
+  };
+}
+
+function renderDeckList() {
+  const decks = state.decks;
+  els.deckCount.textContent = `${decks.length} ${decks.length === 1 ? "deck" : "decks"}`;
+
+  if (!decks.length) {
+    els.deckList.innerHTML = `<div class="empty-state">Noch keine Decks. Gib oben einen Namen ein und leg los.</div>`;
+    return;
+  }
+
+  els.deckList.innerHTML = decks
+    .map(
+      (deck) => `
+        <button type="button" class="deck-tile" data-deck="${escapeHtml(deck.id)}" title="${escapeHtml(deck.name)}">
+          ${
+            deck.commander?.image
+              ? `<img src="${escapeHtml(deck.commander.image)}" alt="Commander ${escapeHtml(deck.commander.name || "")}" loading="lazy" />`
+              : `<span class="deck-tile-empty">Kein Commander gewählt</span>`
+          }
+          <span class="deck-tile-body">
+            <strong>${escapeHtml(deck.name)}</strong>
+            <span>${deck.cardCount} ${deck.cardCount === 1 ? "Karte" : "Karten"}${
+              deck.commander ? ` · ${escapeHtml(deck.commander.name)}` : ""
+            }</span>
+          </span>
+        </button>
+      `
+    )
+    .join("");
+
+  for (const tile of els.deckList.querySelectorAll("button[data-deck]")) {
+    tile.addEventListener("click", () => openDeck(tile.dataset.deck));
+  }
+}
+
+async function refreshDecks() {
+  try {
+    state.decks = await deckStore.list();
+    renderDeckList();
+  } catch (error) {
+    setDeckStatus(`Decks konnten nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
+function showDeckOverview() {
+  state.activeDeck = null;
+  state.activeDeckCards = [];
+  els.deckOverview.hidden = false;
+  els.deckEditor.hidden = true;
+  renderDeckList();
+}
+
+function renderCommanderSlot() {
+  const commander = state.activeDeck?.commander;
+
+  els.commanderSlot.innerHTML = `
+    ${
+      commander?.image
+        ? `<img src="${escapeHtml(commander.image)}" alt="${escapeHtml(commander.name || "Commander")}" />`
+        : `<span class="commander-empty">?</span>`
+    }
+    <div>
+      <span class="field-label">Commander</span>
+      <strong>${commander ? escapeHtml(commander.name) : "Noch keiner gewählt"}</strong>
+      <p class="small-note">${
+        commander
+          ? "Sein Bild steht in der Übersicht für dieses Deck."
+          : "Mit dem Stern bei einer Karte im Deck festlegen."
+      }</p>
+      ${commander ? `<div class="button-row"><button type="button" id="clearCommanderBtn" class="retro-button">Commander entfernen</button></div>` : ""}
+    </div>
+  `;
+
+  const clearBtn = els.commanderSlot.querySelector("#clearCommanderBtn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => setCommander(null));
+  }
+}
+
+function renderDeckCards() {
+  const cards = state.activeDeckCards;
+  const total = cards.reduce((sum, card) => sum + card.quantity, 0);
+  els.deckTotal.textContent = `${total} ${total === 1 ? "Karte" : "Karten"}`;
+
+  if (!cards.length) {
+    els.deckCards.innerHTML = `<div class="empty-state">Noch keine Karten. Such links eine oder nutze Quick Add.</div>`;
+    return;
+  }
+
+  els.deckCards.innerHTML = cards
+    .map(
+      (card) => `
+        <div class="deck-card-row">
+          ${
+            card.image
+              ? `<img src="${escapeHtml(card.image)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+              : `<span></span>`
+          }
+          <span class="deck-card-name">
+            <strong>${escapeHtml(card.name)}</strong>
+            <span>${escapeHtml(card.set_name || "?")}</span>
+          </span>
+          <span class="deck-card-actions">
+            <button type="button" data-less="${escapeHtml(card.id)}" title="Eine weniger" aria-label="Eine weniger">-</button>
+            <span class="quantity">${card.quantity}</span>
+            <button type="button" data-more="${escapeHtml(card.id)}" title="Eine mehr" aria-label="Eine mehr">+</button>
+            <button type="button" data-commander="${escapeHtml(card.id)}" title="Als Commander festlegen" aria-label="Als Commander festlegen">★</button>
+            <button type="button" data-remove="${escapeHtml(card.id)}" title="Aus dem Deck entfernen" aria-label="Entfernen">X</button>
+          </span>
+        </div>
+      `
+    )
+    .join("");
+
+  const find = (id) => state.activeDeckCards.find((card) => card.id === id);
+
+  for (const btn of els.deckCards.querySelectorAll("button[data-more]")) {
+    btn.addEventListener("click", () => {
+      const card = find(btn.dataset.more);
+      if (card) changeDeckQuantity(card, card.quantity + 1);
+    });
+  }
+  for (const btn of els.deckCards.querySelectorAll("button[data-less]")) {
+    btn.addEventListener("click", () => {
+      const card = find(btn.dataset.less);
+      if (!card) return;
+      // Bei eins bedeutet ein weiteres Minus: raus aus dem Deck.
+      if (card.quantity <= 1) removeDeckCard(card.id);
+      else changeDeckQuantity(card, card.quantity - 1);
+    });
+  }
+  for (const btn of els.deckCards.querySelectorAll("button[data-remove]")) {
+    btn.addEventListener("click", () => removeDeckCard(btn.dataset.remove));
+  }
+  for (const btn of els.deckCards.querySelectorAll("button[data-commander]")) {
+    btn.addEventListener("click", () => {
+      const card = find(btn.dataset.commander);
+      if (card) setCommander(card);
+    });
+  }
+}
+
+function renderDeckEditor() {
+  if (!state.activeDeck) {
+    return;
+  }
+  els.deckNameInput.value = state.activeDeck.name;
+  renderCommanderSlot();
+  renderDeckCards();
+}
+
+function applyDeckResult(result) {
+  state.activeDeck = result.deck;
+  state.activeDeckCards = result.cards || [];
+  renderDeckEditor();
+}
+
+async function openDeck(deckId) {
+  setDeckStatus("Lade Deck...", "muted");
+  try {
+    const result = await deckStore.get(deckId);
+    applyDeckResult(result);
+    els.deckOverview.hidden = true;
+    els.deckEditor.hidden = false;
+    setDeckStatus(`Deck geöffnet: ${result.deck.name}`, "ok");
+  } catch (error) {
+    setDeckStatus(`Deck konnte nicht geöffnet werden: ${error.message}`, "err");
+  }
+}
+
+async function createDeck() {
+  const name = els.newDeckName.value.trim();
+  setDeckStatus("Lege Deck an...", "muted");
+  try {
+    const deck = await deckStore.create(name);
+    els.newDeckName.value = "";
+    await refreshDecks();
+    setDeckStatus(`Deck "${deck.name}" angelegt.`, "ok");
+    await openDeck(deck.id);
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+async function renameDeck() {
+  if (!state.activeDeck) return;
+  const name = els.deckNameInput.value.trim();
+  try {
+    applyDeckResult(await deckStore.update(state.activeDeck.id, { name }));
+    await refreshDecks();
+    setDeckStatus("Deckname gespeichert.", "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+async function deleteDeck() {
+  if (!state.activeDeck) return;
+  const name = state.activeDeck.name;
+  if (!window.confirm(`Deck "${name}" wirklich löschen? Das lässt sich nicht rückgängig machen.`)) {
+    return;
+  }
+  try {
+    await deckStore.remove(state.activeDeck.id);
+    showDeckOverview();
+    await refreshDecks();
+    setDeckStatus(`Deck "${name}" gelöscht.`, "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+async function addCardToDeck(card, quantity = 1) {
+  if (!state.activeDeck) return;
+  try {
+    applyDeckResult(await deckStore.putCard(state.activeDeck.id, deckCardFromScryfall(card), quantity));
+    setDeckStatus(`${card.name} ins Deck gelegt.`, "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+async function changeDeckQuantity(card, quantity) {
+  try {
+    applyDeckResult(await deckStore.putCard(state.activeDeck.id, card, quantity));
+    setDeckStatus(`${card.name}: ${quantity}x`, "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+async function removeDeckCard(cardId) {
+  try {
+    applyDeckResult(await deckStore.removeCard(state.activeDeck.id, cardId));
+    setDeckStatus("Karte entfernt.", "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+async function setCommander(card) {
+  if (!state.activeDeck) return;
+  try {
+    const commander = card ? { id: card.id, name: card.name, image: card.image ?? null } : null;
+    applyDeckResult(await deckStore.update(state.activeDeck.id, { commander }));
+    await refreshDecks();
+    setDeckStatus(card ? `${card.name} ist jetzt Commander.` : "Commander entfernt.", "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+function renderDeckSearchResults() {
+  const results = state.deckResults;
+  els.deckSearchCount.textContent = `${results.length} ${results.length === 1 ? "card" : "cards"}`;
+
+  if (!results.length) {
+    els.deckSearchResults.innerHTML = `<div class="empty-state">Noch keine Treffer.</div>`;
+    return;
+  }
+
+  els.deckSearchResults.innerHTML = `
+    <div class="search-grid">
+      ${results
+        .map((card) => {
+          const preview = getCardPreviewUrl(card);
+          return `
+            <button type="button" class="search-tile" data-add="${escapeHtml(card.id)}" title="${escapeHtml(card.name)} ins Deck legen">
+              <span class="tile-frame">
+                ${
+                  preview
+                    ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+                    : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
+                }
+              </span>
+              <span class="tile-caption">${escapeHtml(card.name)}</span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+
+  for (const tile of els.deckSearchResults.querySelectorAll("button[data-add]")) {
+    tile.addEventListener("click", () => {
+      const card = state.deckResults.find((entry) => entry.id === tile.dataset.add);
+      if (card) addCardToDeck(card);
+    });
+  }
+}
+
+async function runDeckSearch() {
+  const query = els.deckSearchInput.value.trim();
+  if (!query) {
+    setDeckStatus("Bitte einen Suchbegriff eingeben.", "err");
+    return;
+  }
+
+  setDeckStatus(`Suche nach ${query}...`, "muted");
+  try {
+    const result = await searchCardsWithTolerance(query);
+    state.deckResults = result.cards;
+    renderDeckSearchResults();
+    setDeckStatus(
+      state.deckResults.length ? `${state.deckResults.length} Treffer.` : "Keine Treffer gefunden.",
+      state.deckResults.length ? "ok" : "err"
+    );
+  } catch (error) {
+    state.deckResults = [];
+    renderDeckSearchResults();
+    setDeckStatus(`Fehler bei der Suche: ${error.message}`, "err");
+  }
+}
+
+// Quick Add nimmt den besten Treffer zum Namen, damit man eine Karte
+// eintippen kann, ohne den Umweg über die Suchergebnisse.
+async function quickAdd() {
+  const name = els.quickAddInput.value.trim();
+  if (!name) {
+    setDeckStatus("Bitte einen Kartennamen eingeben.", "err");
+    return;
+  }
+
+  setDeckStatus(`Suche ${name}...`, "muted");
+  try {
+    const card = await fetchJson(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+    els.quickAddInput.value = "";
+    await addCardToDeck(card);
+  } catch (error) {
+    setDeckStatus(`Keine Karte zu "${name}" gefunden.`, "err");
+  }
+}
+
 function setAuthStatus(text, type = "muted") {
   if (!els.authStatus) {
     return;
@@ -1137,6 +1525,19 @@ async function adoptSession(user, { mergeLocal = false } = {}) {
     setAuthStatus(`Collection konnte nicht geladen werden: ${error.message}`, "err");
   }
 
+  // Lokal angelegte Decks wandern beim Login mit hoch.
+  try {
+    const localDecks = mergeLocal ? deckStore.takeLocalDecks() : [];
+    if (localDecks.length) {
+      await api.mergeDecks(localDecks);
+      deckStore.clearLocal();
+    }
+  } catch (error) {
+    setAuthStatus(`Decks konnten nicht übernommen werden: ${error.message}`, "err");
+  }
+
+  showDeckOverview();
+  await refreshDecks();
   renderAccount();
   renderCollectionViews();
 }
@@ -1245,6 +1646,8 @@ async function handleLogout() {
 
   renderAccount();
   renderCollectionViews();
+  showDeckOverview();
+  await refreshDecks();
   showAuthTab("login");
   // Keinen Code auf dem Bildschirm stehen lassen.
   hideRecoveryCode();
@@ -1267,6 +1670,31 @@ async function initAuth() {
   }
 }
 
+els.createDeckBtn.addEventListener("click", createDeck);
+els.newDeckName.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") createDeck();
+});
+els.backToDecksBtn.addEventListener("click", showDeckOverview);
+els.deleteDeckBtn.addEventListener("click", deleteDeck);
+els.renameDeckBtn.addEventListener("click", renameDeck);
+els.deckNameInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") renameDeck();
+});
+els.deckSearchBtn.addEventListener("click", runDeckSearch);
+els.deckSearchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") runDeckSearch();
+});
+els.quickAddBtn.addEventListener("click", quickAdd);
+els.quickAddInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") quickAdd();
+});
+els.deckQueryButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    els.deckSearchInput.value = button.dataset.deckQuery || "";
+    runDeckSearch();
+  });
+});
+
 els.authTabs.forEach((tab) => {
   tab.addEventListener("click", () => showAuthTab(tab.dataset.authTab));
 });
@@ -1281,6 +1709,8 @@ els.dismissRecoveryBtn.addEventListener("click", hideRecoveryCode);
 
 bindQueryButtons();
 bindRandomButtons();
+showDeckOverview();
+renderDeckSearchResults();
 renderResults();
 renderSearchDetails();
 renderCollection();

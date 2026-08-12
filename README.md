@@ -75,6 +75,14 @@ sends it automatically, so you do not have to handle it yourself.
 | PUT | `/collection/:cardId` | Add or update one card |
 | DELETE | `/collection/:cardId` | Remove one card |
 | POST | `/collection/merge` | Copy local cards up without overwriting |
+| GET | `/decks` | List all decks with their card count |
+| POST | `/decks` | Create a deck |
+| GET | `/decks/:id` | One deck with all its cards |
+| PATCH | `/decks/:id` | Rename a deck or set its commander |
+| DELETE | `/decks/:id` | Delete a deck |
+| PUT | `/decks/:id/cards/:cardId` | Add a card or change how many copies |
+| DELETE | `/decks/:id/cards/:cardId` | Take a card out |
+| POST | `/decks/merge` | Copy local decks up when you log in |
 
 ## About security
 
@@ -110,6 +118,29 @@ Resetting also ends all open sessions, so somebody who was already logged in
 gets kicked out. The reset route has the same block as the login, so the code
 cannot be guessed by trying many times.
 
+## Decks
+
+The Decks tab holds every deck you build. Each deck has a name and can have a
+commander. The commander's card picture is what you see on the deck in the
+overview, so you can tell your decks apart at a glance.
+
+Click a deck to open the editor. It has two windows side by side: card search
+on the left, the deck itself on the right.
+
+- **Search** takes plain names or full Scryfall syntax like `c:g t:creature
+  mv<=3`. Click a result and it goes into the deck.
+- **Quick Add** sits in the deck window. Type a card name and it takes the best
+  match, even if you spell it a bit wrong.
+- Every card row has `-` and `+` for the number of copies, a star to make that
+  card the commander, and `X` to take it out. Going below one copy removes the
+  card.
+- The commander is not counted in the card list. That follows the Commander
+  rules, where it sits apart from the rest of the deck.
+
+Decks work without an account too. They then live in your browser and move up
+to your account the first time you log in.
+
 ## Not done yet
 
-- Building decks from your collection. This is the next big goal.
+- No card legality or deck size checks yet, so nothing stops you from putting
+  a card in a deck where it is not allowed.

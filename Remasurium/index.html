@@ -22,6 +22,7 @@
         <a class="nav-link" href="#/home">Home</a>
         <a class="nav-link" href="#/suche">Suche</a>
         <a class="nav-link" href="#/collection">Collection</a>
+        <a class="nav-link" href="#/decks">Decks</a>
         <a class="nav-link" href="#/account">Account</a>
       </nav>
 
@@ -204,6 +205,89 @@
             <div id="collection" class="collection-list"></div>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section id="view-decks" class="view">
+      <div id="deckOverview">
+        <article class="window panel">
+          <div class="panel-title-bar panel-title-bar-wide">
+            <span>my decks</span>
+            <strong id="deckCount">0 decks</strong>
+          </div>
+          <div class="panel-body">
+            <label class="field-label" for="newDeckName">Neues Deck</label>
+            <div class="search-row">
+              <input id="newDeckName" type="text" maxlength="80" placeholder="z.B. Atraxa Superfreunde" autocomplete="off" />
+              <button id="createDeckBtn" type="button">Erstellen</button>
+            </div>
+
+            <div class="status-wrap">
+              <span class="field-label">Status</span>
+              <div id="deckStatus" class="status muted">Bereit.</div>
+            </div>
+
+            <div id="deckList" class="deck-grid"></div>
+          </div>
+        </article>
+      </div>
+
+      <div id="deckEditor" hidden>
+        <div class="deck-layout">
+          <article class="window panel console-panel">
+            <div class="panel-title-bar panel-title-bar-wide">
+              <span>card search</span>
+              <strong id="deckSearchCount">0 cards</strong>
+            </div>
+            <div class="panel-body">
+              <label class="field-label" for="deckSearchInput">Card name / Scryfall query</label>
+              <div class="search-row">
+                <input id="deckSearchInput" type="text" placeholder="z.B. c:g t:creature" autocomplete="off" />
+                <button id="deckSearchBtn" type="button">Suchen</button>
+              </div>
+
+              <div class="query-bank">
+                <button type="button" class="query-pill" data-deck-query="t:legendary t:creature">legendary creature</button>
+                <button type="button" class="query-pill" data-deck-query="c:g t:creature mv&lt;=3">grün, klein</button>
+                <button type="button" class="query-pill" data-deck-query="o:&quot;draw a card&quot;">draw a card</button>
+              </div>
+
+              <p class="small-note">Klick auf eine Karte legt sie ins Deck.</p>
+
+              <div id="deckSearchResults" class="results"></div>
+            </div>
+          </article>
+
+          <article class="window panel">
+            <div class="panel-title-bar panel-title-bar-wide">
+              <span>deck</span>
+              <strong id="deckTotal">0 Karten</strong>
+            </div>
+            <div class="panel-body">
+              <div class="button-row deck-toolbar">
+                <button id="backToDecksBtn" type="button" class="retro-button">Zurück zur Übersicht</button>
+                <button id="deleteDeckBtn" type="button" class="retro-button">Deck löschen</button>
+              </div>
+
+              <label class="field-label" for="deckNameInput">Deckname</label>
+              <div class="search-row">
+                <input id="deckNameInput" type="text" maxlength="80" autocomplete="off" />
+                <button id="renameDeckBtn" type="button">Speichern</button>
+              </div>
+
+              <div id="commanderSlot" class="commander-slot"></div>
+
+              <label class="field-label" for="quickAddInput">Quick Add</label>
+              <div class="search-row">
+                <input id="quickAddInput" type="text" placeholder="Kartenname, z.B. sol ring" autocomplete="off" />
+                <button id="quickAddBtn" type="button">Hinzufügen</button>
+              </div>
+              <p class="small-note">Nimmt den besten Treffer zum Namen, auch bei kleinen Tippfehlern.</p>
+
+              <div id="deckCards" class="deck-cards"></div>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
