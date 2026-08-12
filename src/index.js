@@ -426,6 +426,295 @@ async function handleMergeCollection(request, env, user) {
   return handleGetCollection(env, user);
 }
 
+const MAX_DECKS = 200;
+const MAX_DECK_CARDS = 500;
+
+function deckFromRow(row, cardCount = 0) {
+  return {
+    id: row.id,
+    name: row.name,
+    commander: row.commander_card_id
+      ? { id: row.commander_card_id, name: row.commander_name, image: row.commander_image }
+      : null,
+    cardCount,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function deckCardFromRow(row) {
+  return {
+    id: row.card_id,
+    name: row.name,
+    set_name: row.set_name,
+    image: row.image,
+    quantity: row.quantity
+  };
+}
+
+function cleanDeckName(value) {
+  return String(value || "").trim().slice(0, 80);
+}
+
+async function touchDeck(env, deckId) {
+  await env.DB.prepare("UPDATE decks SET updated_at = ? WHERE id = ?")
+    .bind(new Date().toISOString(), deckId)
+    .run();
+}
+
+async function findDeck(env, userId, deckId) {
+  return env.DB.prepare("SELECT * FROM decks WHERE id = ? AND user_id = ?").bind(deckId, userId).first();
+}
+
+async function handleListDecks(env, user) {
+  const { results } = await env.DB.prepare(
+    `SELECT d.*, COALESCE(SUM(c.quantity), 0) AS card_count
+       FROM decks d
+       LEFT JOIN deck_cards c ON c.deck_id = d.id
+      WHERE d.user_id = ?
+      GROUP BY d.id
+      ORDER BY d.updated_at DESC`
+  )
+    .bind(user.id)
+    .all();
+
+  return json({ decks: (results || []).map((row) => deckFromRow(row, row.card_count)) });
+}
+
+async function handleCreateDeck(request, env, user) {
+  const body = await readJson(request);
+  const name = cleanDeckName(body?.name) || "Neues Deck";
+
+  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM decks WHERE user_id = ?")
+    .bind(user.id)
+    .first();
+  if ((count?.n || 0) >= MAX_DECKS) {
+    return fail(`Mehr als ${MAX_DECKS} Decks sind nicht möglich.`, 409);
+  }
+
+  const now = new Date().toISOString();
+  const deck = { id: crypto.randomUUID(), name, created_at: now, updated_at: now };
+
+  await env.DB.prepare(
+    "INSERT INTO decks (id, user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+  )
+    .bind(deck.id, user.id, deck.name, now, now)
+    .run();
+
+  return json({ deck: deckFromRow(deck) }, 201);
+}
+
+async function handleGetDeck(env, user, deckId) {
+  const deck = await findDeck(env, user.id, deckId);
+  if (!deck) {
+    return fail("Deck nicht gefunden.", 404);
+  }
+
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM deck_cards WHERE deck_id = ? ORDER BY added_at DESC"
+  )
+    .bind(deckId)
+    .all();
+
+  const cards = (results || []).map(deckCardFromRow);
+  const total = cards.reduce((sum, card) => sum + card.quantity, 0);
+
+  return json({ deck: deckFromRow(deck, total), cards });
+}
+
+async function handleUpdateDeck(request, env, user, deckId) {
+  const deck = await findDeck(env, user.id, deckId);
+  if (!deck) {
+    return fail("Deck nicht gefunden.", 404);
+  }
+
+  const body = await readJson(request);
+  if (!body) {
+    return fail("Ungültiger Request-Body.");
+  }
+
+  const updates = [];
+  const values = [];
+
+  if (body.name !== undefined) {
+    const name = cleanDeckName(body.name);
+    if (!name) {
+      return fail("Der Deckname darf nicht leer sein.");
+    }
+    updates.push("name = ?");
+    values.push(name);
+  }
+
+  // commander: null entfernt ihn, ein Objekt setzt ihn.
+  if (body.commander !== undefined) {
+    if (body.commander === null) {
+      updates.push("commander_card_id = NULL", "commander_name = NULL", "commander_image = NULL");
+    } else {
+      const card = cardFromInput(body.commander);
+      if (!card) {
+        return fail("Commander-Daten unvollständig.");
+      }
+      updates.push("commander_card_id = ?", "commander_name = ?", "commander_image = ?");
+      values.push(card.id, card.name, card.image);
+      // Der Commander gehört nicht zusätzlich in die Kartenliste.
+      await env.DB.prepare("DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ?")
+        .bind(deckId, card.id)
+        .run();
+    }
+  }
+
+  if (!updates.length) {
+    return fail("Nichts zu ändern.");
+  }
+
+  updates.push("updated_at = ?");
+  values.push(new Date().toISOString(), deckId);
+
+  await env.DB.prepare(`UPDATE decks SET ${updates.join(", ")} WHERE id = ?`)
+    .bind(...values)
+    .run();
+
+  return handleGetDeck(env, user, deckId);
+}
+
+async function handleDeleteDeck(env, user, deckId) {
+  const deck = await findDeck(env, user.id, deckId);
+  if (!deck) {
+    return fail("Deck nicht gefunden.", 404);
+  }
+  await env.DB.prepare("DELETE FROM deck_cards WHERE deck_id = ?").bind(deckId).run();
+  await env.DB.prepare("DELETE FROM decks WHERE id = ?").bind(deckId).run();
+  return json({ ok: true });
+}
+
+async function handlePutDeckCard(request, env, user, deckId, cardId) {
+  const deck = await findDeck(env, user.id, deckId);
+  if (!deck) {
+    return fail("Deck nicht gefunden.", 404);
+  }
+
+  const body = await readJson(request);
+  const card = cardFromInput({ ...body, id: cardId });
+  if (!card) {
+    return fail("Kartendaten unvollständig.");
+  }
+
+  const quantity = Math.min(Math.max(Number(body?.quantity) || 1, 1), 99);
+
+  const totals = await env.DB.prepare(
+    "SELECT COALESCE(SUM(quantity), 0) AS n FROM deck_cards WHERE deck_id = ? AND card_id <> ?"
+  )
+    .bind(deckId, card.id)
+    .first();
+
+  if ((totals?.n || 0) + quantity > MAX_DECK_CARDS) {
+    return fail(`Ein Deck fasst höchstens ${MAX_DECK_CARDS} Karten.`, 409);
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO deck_cards (deck_id, card_id, name, set_name, image, quantity, added_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (deck_id, card_id) DO UPDATE SET
+       name = excluded.name,
+       set_name = excluded.set_name,
+       image = excluded.image,
+       quantity = excluded.quantity`
+  )
+    .bind(deckId, card.id, card.name, card.set_name, card.image, quantity, new Date().toISOString())
+    .run();
+
+  await touchDeck(env, deckId);
+  return handleGetDeck(env, user, deckId);
+}
+
+async function handleDeleteDeckCard(env, user, deckId, cardId) {
+  const deck = await findDeck(env, user.id, deckId);
+  if (!deck) {
+    return fail("Deck nicht gefunden.", 404);
+  }
+  await env.DB.prepare("DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ?")
+    .bind(deckId, cardId)
+    .run();
+  await touchDeck(env, deckId);
+  return handleGetDeck(env, user, deckId);
+}
+
+// Übernahme der lokal angelegten Decks beim Login.
+async function handleMergeDecks(request, env, user) {
+  const body = await readJson(request);
+  const input = Array.isArray(body?.decks) ? body.decks : null;
+  if (!input) {
+    return fail("Erwartet wird ein Feld 'decks' mit einer Liste.");
+  }
+
+  const existing = await env.DB.prepare("SELECT COUNT(*) AS n FROM decks WHERE user_id = ?")
+    .bind(user.id)
+    .first();
+  let budget = MAX_DECKS - (existing?.n || 0);
+  const now = Date.now();
+
+  for (const [index, raw] of input.entries()) {
+    if (budget <= 0) {
+      break;
+    }
+    budget -= 1;
+
+    const name = cleanDeckName(raw?.name) || "Neues Deck";
+    const deckId = crypto.randomUUID();
+    const stamp = new Date(now - index * 1000).toISOString();
+    const commander = raw?.commander ? cardFromInput(raw.commander) : null;
+
+    await env.DB.prepare(
+      `INSERT INTO decks (id, user_id, name, commander_card_id, commander_name, commander_image, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        deckId,
+        user.id,
+        name,
+        commander?.id || null,
+        commander?.name || null,
+        commander?.image || null,
+        stamp,
+        stamp
+      )
+      .run();
+
+    // cardFromInput kennt keine Menge, die muss aus den Rohdaten kommen.
+    const cards = (Array.isArray(raw?.cards) ? raw.cards : [])
+      .map((entry) => {
+        const card = cardFromInput(entry);
+        return card ? { ...card, quantity: Math.min(Math.max(Number(entry?.quantity) || 1, 1), 99) } : null;
+      })
+      .filter(Boolean)
+      .slice(0, MAX_DECK_CARDS);
+
+    if (cards.length) {
+      const statement = env.DB.prepare(
+        `INSERT INTO deck_cards (deck_id, card_id, name, set_name, image, quantity, added_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (deck_id, card_id) DO NOTHING`
+      );
+
+      await env.DB.batch(
+        cards.map((card, i) =>
+          statement.bind(
+            deckId,
+            card.id,
+            card.name,
+            card.set_name,
+            card.image,
+            Math.min(Math.max(Number(card.quantity) || 1, 1), 99),
+            new Date(now - i * 1000).toISOString()
+          )
+        )
+      );
+    }
+  }
+
+  return handleListDecks(env, user);
+}
+
 async function handleApi(request, env, url) {
   if (!env.DB) {
     return fail("Die Datenbank ist nicht konfiguriert (Binding 'DB' fehlt).", 503);
@@ -479,6 +768,42 @@ async function handleApi(request, env, url) {
     }
     if (method === "DELETE") {
       return handleDeleteCard(env, user, cardId);
+    }
+  }
+
+  if (path === "/decks" && method === "GET") {
+    return handleListDecks(env, user);
+  }
+  if (path === "/decks" && method === "POST") {
+    return handleCreateDeck(request, env, user);
+  }
+  if (path === "/decks/merge" && method === "POST") {
+    return handleMergeDecks(request, env, user);
+  }
+
+  const deckMatch = path.match(/^\/decks\/([^/]+)$/);
+  if (deckMatch) {
+    const deckId = decodeURIComponent(deckMatch[1]);
+    if (method === "GET") {
+      return handleGetDeck(env, user, deckId);
+    }
+    if (method === "PATCH") {
+      return handleUpdateDeck(request, env, user, deckId);
+    }
+    if (method === "DELETE") {
+      return handleDeleteDeck(env, user, deckId);
+    }
+  }
+
+  const deckCardMatch = path.match(/^\/decks\/([^/]+)\/cards\/([^/]+)$/);
+  if (deckCardMatch) {
+    const deckId = decodeURIComponent(deckCardMatch[1]);
+    const cardId = decodeURIComponent(deckCardMatch[2]);
+    if (method === "PUT") {
+      return handlePutDeckCard(request, env, user, deckId, cardId);
+    }
+    if (method === "DELETE") {
+      return handleDeleteDeckCard(env, user, deckId, cardId);
     }
   }
 
