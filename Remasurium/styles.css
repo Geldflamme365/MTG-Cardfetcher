@@ -868,11 +868,35 @@ body.is-splitting {
   background: linear-gradient(180deg, #ece8de, #d7d2c8);
 }
 
-.deck-card-row img {
+/* Das Kartenbild ist der Knopf für den Versionswechsel. */
+.deck-card-thumb {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+
+.deck-card-thumb:hover,
+.deck-card-thumb:focus-visible {
+  border-color: #9e87e2;
+  outline: none;
+}
+
+.deck-card-thumb img {
   display: block;
   width: 100%;
   aspect-ratio: 63 / 88;
   object-fit: cover;
+}
+
+.deck-card-thumb-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 63 / 88;
+  color: #cdbef8;
+  background: #181126;
 }
 
 .deck-card-name {

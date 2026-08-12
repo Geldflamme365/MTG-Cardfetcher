@@ -855,6 +855,9 @@ function renderVersionModal() {
         if (targetContext === "deck") {
           closeVersionModal();
           await applyDeckVersion(selectedPrint);
+        } else if (targetContext === "commander") {
+          closeVersionModal();
+          await applyCommanderVersion(selectedPrint);
         } else if (targetContext === "search") {
           await selectSearchCard(selectedPrint);
         } else {
@@ -1202,7 +1205,11 @@ function renderCommanderSlot() {
   els.commanderSlot.innerHTML = `
     ${
       commander?.image
-        ? `<img src="${escapeHtml(commander.image)}" alt="${escapeHtml(commander.name || "Commander")}" />`
+        ? `<button type="button" class="deck-card-thumb" id="commanderVersionBtn" title="Version von ${escapeHtml(
+            commander.name || "Commander"
+          )} wechseln" aria-label="Version des Commanders wechseln"><img src="${escapeHtml(
+            commander.image
+          )}" alt="${escapeHtml(commander.name || "Commander")}" /></button>`
         : `<span class="commander-empty">?</span>`
     }
     <div>
@@ -1221,6 +1228,45 @@ function renderCommanderSlot() {
   if (clearBtn) {
     clearBtn.addEventListener("click", () => setCommander(null));
   }
+
+  const versionBtn = els.commanderSlot.querySelector("#commanderVersionBtn");
+  if (versionBtn) {
+    versionBtn.addEventListener("click", () => openCommanderVersionPicker(commander));
+  }
+}
+
+async function openCommanderVersionPicker(commander) {
+  if (!commander) {
+    return;
+  }
+
+  setDeckStatus(`Lade Versionen von ${commander.name}...`, "muted");
+  try {
+    const full = await fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(commander.id)}`);
+    const prints = await loadPrintHistory(full);
+    if (prints.length < 2) {
+      setDeckStatus(`Von ${commander.name} gibt es nur diesen einen Print.`, "muted");
+      return;
+    }
+    state.searchPrints = prints;
+    state.searchSelection = full;
+    openVersionModal("commander");
+    setDeckStatus(`${prints.length} Versionen von ${commander.name}.`, "ok");
+  } catch (error) {
+    setDeckStatus(`Versionen konnten nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
+// Beim Commander wird kein Eintrag getauscht, sondern das Deck
+// aktualisiert. Das Artwork muss dabei mitwandern, sonst zeigt die
+// Übersicht weiter das Bild der alten Ausgabe.
+async function applyCommanderVersion(print) {
+  await setCommander({
+    id: print.id,
+    name: print.name,
+    image: getCardPreviewUrl(print),
+    art: getCardArtUrl(print)
+  });
 }
 
 function renderDeckCards() {
@@ -1240,11 +1286,13 @@ function renderDeckCards() {
     .map(
       (card) => `
         <div class="deck-card-row">
-          ${
-            card.image
-              ? `<img src="${escapeHtml(card.image)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
-              : `<span></span>`
-          }
+          <button type="button" class="deck-card-thumb" data-version="${escapeHtml(card.id)}" title="Version von ${escapeHtml(card.name)} wechseln" aria-label="Version von ${escapeHtml(card.name)} wechseln">
+            ${
+              card.image
+                ? `<img src="${escapeHtml(card.image)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+                : `<span class="deck-card-thumb-empty">?</span>`
+            }
+          </button>
           <span class="deck-card-name">
             <strong>${escapeHtml(card.name)}</strong>
             <span>${escapeHtml(card.set_name || "?")}</span>
@@ -1257,7 +1305,6 @@ function renderDeckCards() {
                 ? "Im Commander ist nur ein Exemplar erlaubt"
                 : "Eine mehr"
             }" aria-label="Eine mehr"${singleton && !card.unlimited ? " disabled" : ""}>+</button>
-            <button type="button" data-version="${escapeHtml(card.id)}" title="Version wechseln" aria-label="Version wechseln">⇄</button>
             <button type="button" data-commander="${escapeHtml(card.id)}" title="Als Commander festlegen" aria-label="Als Commander festlegen">★</button>
             <button type="button" data-remove="${escapeHtml(card.id)}" title="Aus dem Deck entfernen" aria-label="Entfernen">X</button>
           </span>

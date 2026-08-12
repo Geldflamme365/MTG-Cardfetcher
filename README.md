@@ -141,11 +141,13 @@ width is remembered for next time. You can also move it with the arrow keys.
   mv<=3`. Click a result and it goes into the deck.
 - **Quick Add** sits in the deck window. Type a card name and it takes the best
   match, even if you spell it a bit wrong.
-- Every card row has `-` and `+` for the number of copies, `⇄` to swap the
-  printing, a star to make that card the commander, and `X` to take it out.
-  Going below one copy removes the card.
-- `⇄` opens the same version window as the collection. Pick another printing
-  and the card in the deck is swapped for it, keeping the number of copies.
+- Every card row has `-` and `+` for the number of copies, a star to make that
+  card the commander, and `X` to take it out. Going below one copy removes the
+  card.
+- Click the picture of a card to change its printing. That works for the cards
+  in the list and for the commander. It opens the same version window as the
+  collection, and the card keeps its number of copies. For the commander the
+  artwork in the overview changes along with it.
 - A card made commander leaves the card list, the way the Commander rules put
   it apart from the rest of the deck. It still counts towards the deck size.
 
