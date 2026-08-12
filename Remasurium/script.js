@@ -90,6 +90,10 @@ const els = {
   deckTotal: document.getElementById("deckTotal"),
   quickAddInput: document.getElementById("quickAddInput"),
   quickAddBtn: document.getElementById("quickAddBtn"),
+  deckListText: document.getElementById("deckListText"),
+  deckExportBtn: document.getElementById("deckExportBtn"),
+  deckImportBtn: document.getElementById("deckImportBtn"),
+  deckCopyBtn: document.getElementById("deckCopyBtn"),
   navLinks: document.querySelectorAll(".nav-link"),
   authStatus: document.getElementById("authStatus"),
   accountGuest: document.getElementById("accountGuest"),
@@ -1204,6 +1208,21 @@ function allowsAnyNumber(card) {
   return /any number of cards named/i.test(text);
 }
 
+// Commander darf sein: jede legendäre Kreatur, dazu Karten, die es
+// ausdrücklich erlauben. Das betrifft vor allem Planeswalker wie
+// Commodore Guff, die keine Kreaturen sind.
+function canBeCommander(card) {
+  const text = [card.oracle_text, ...(card.card_faces || []).map((face) => face.oracle_text)]
+    .filter(Boolean)
+    .join(" ");
+  if (/can be your commander/i.test(text)) {
+    return true;
+  }
+
+  const type = card.type_line || "";
+  return /Legendary/i.test(type) && /Creature/i.test(type);
+}
+
 function getCardArtUrl(card) {
   return card.image_uris?.art_crop || card.card_faces?.[0]?.image_uris?.art_crop || null;
 }
@@ -1659,6 +1678,174 @@ async function setCommander(card) {
   }
 }
 
+// Format wie bei Moxfield und Arena: eine Karte pro Zeile, davor die
+// Anzahl. Set-Angaben in Klammern und Kommentarzeilen werden überlesen.
+function parseDeckList(text) {
+  const entries = [];
+
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//") || line.startsWith("#")) {
+      continue;
+    }
+
+    const match = line.match(/^(?:(\d+)\s*[xX]?\s+)?(.+)$/);
+    if (!match) {
+      continue;
+    }
+
+    const name = match[2]
+      .replace(/\s*\([^)]*\)\s*[\w-]*\s*$/, "")
+      .replace(/\s*\*[^*]*\*\s*$/, "")
+      .trim();
+
+    if (name) {
+      entries.push({ name, quantity: Math.min(Math.max(Number(match[1]) || 1, 1), 99) });
+    }
+  }
+
+  return entries;
+}
+
+function exportDeckList() {
+  if (!state.activeDeck) {
+    return;
+  }
+
+  const lines = [];
+  if (state.activeDeck.commander) {
+    lines.push(`1 ${state.activeDeck.commander.name}`);
+  }
+  for (const card of state.activeDeckCards) {
+    lines.push(`${card.quantity} ${card.name}`);
+  }
+
+  els.deckListText.value = lines.join("\n");
+  setDeckStatus(`${lines.length} Zeilen exportiert.`, "ok");
+}
+
+async function copyDeckList() {
+  if (!els.deckListText.value.trim()) {
+    exportDeckList();
+  }
+  try {
+    await navigator.clipboard.writeText(els.deckListText.value);
+    setDeckStatus("Liste in die Zwischenablage kopiert.", "ok");
+  } catch {
+    setDeckStatus("Kopieren hat nicht geklappt, bitte von Hand markieren.", "err");
+  }
+}
+
+// Scryfall nimmt bis zu 75 Karten je Anfrage entgegen. Das ist deutlich
+// schonender, als jede Zeile einzeln abzufragen.
+async function lookupCardsByName(names) {
+  const found = new Map();
+  const missing = [];
+
+  for (let i = 0; i < names.length; i += 75) {
+    const chunk = names.slice(i, i + 75);
+    const response = await scryfallFetch("https://api.scryfall.com/cards/collection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    for (const card of data.data || []) {
+      found.set(card.name.toLowerCase(), card);
+      // Bei doppelseitigen Karten steht in der Liste oft nur die
+      // Vorderseite.
+      const front = card.name.split("//")[0].trim().toLowerCase();
+      if (!found.has(front)) {
+        found.set(front, card);
+      }
+    }
+    for (const entry of data.not_found || []) {
+      missing.push(entry.name);
+    }
+  }
+
+  return { found, missing };
+}
+
+async function importDeckList() {
+  if (!state.activeDeck) {
+    return;
+  }
+
+  const entries = parseDeckList(els.deckListText.value);
+  if (!entries.length) {
+    setDeckStatus("Die Liste ist leer.", "err");
+    return;
+  }
+
+  setDeckStatus(`Suche ${entries.length} Karten...`, "muted");
+
+  let found;
+  let missing;
+  try {
+    ({ found, missing } = await lookupCardsByName(entries.map((entry) => entry.name)));
+  } catch (error) {
+    setDeckStatus(`Import fehlgeschlagen: ${error.message}`, "err");
+    return;
+  }
+
+  // Was Scryfall exakt nicht kennt, bekommt eine zweite Chance mit
+  // toleranter Suche - so überleben kleine Tippfehler.
+  const stillMissing = [];
+  for (const name of missing) {
+    try {
+      const card = await fetchJson(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+      found.set(name.toLowerCase(), card);
+    } catch {
+      stillMissing.push(name);
+    }
+  }
+
+  let added = 0;
+  let commanderSet = false;
+
+  for (const entry of entries) {
+    const card = found.get(entry.name.toLowerCase());
+    if (!card) {
+      continue;
+    }
+
+    // Die erste legendäre Kreatur wird Commander, sofern noch keiner
+    // gewählt ist. Damit lässt sich ein exportiertes Deck unverändert
+    // wieder einlesen.
+    if (!commanderSet && !state.activeDeck.commander && canBeCommander(card)) {
+      await setCommander({
+        id: card.id,
+        name: card.name,
+        image: getCardPreviewUrl(card),
+        art: getCardArtUrl(card)
+      });
+      commanderSet = true;
+      added += 1;
+      continue;
+    }
+
+    try {
+      applyDeckResult(
+        await deckStore.putCard(state.activeDeck.id, deckCardFromScryfall(card), entry.quantity)
+      );
+      added += 1;
+    } catch {
+      stillMissing.push(entry.name);
+    }
+  }
+
+  await refreshDecks();
+
+  const problem = stillMissing.length ? ` Nicht gefunden: ${stillMissing.join(", ")}.` : "";
+  setDeckStatus(`${added} von ${entries.length} Karten übernommen.${problem}`, stillMissing.length ? "err" : "ok");
+}
+
 function renderDeckCardDetails() {
   els.deckCardDetails.innerHTML = createDetailsHtml(state.deckSelection, state.deckPrints, "deck");
   bindDetailsEvents(els.deckCardDetails, "deck");
@@ -2080,6 +2267,9 @@ els.quickAddBtn.addEventListener("click", quickAdd);
 els.quickAddInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") quickAdd();
 });
+els.deckExportBtn.addEventListener("click", exportDeckList);
+els.deckImportBtn.addEventListener("click", importDeckList);
+els.deckCopyBtn.addEventListener("click", copyDeckList);
 
 els.authTabs.forEach((tab) => {
   tab.addEventListener("click", () => showAuthTab(tab.dataset.authTab));

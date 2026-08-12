@@ -862,6 +862,41 @@ body.is-splitting {
   border-color: #8b867c #ffffff #ffffff #8b867c;
 }
 
+.deck-io {
+  margin-top: 14px;
+  padding: 10px;
+  border: 2px solid;
+  border-color: var(--edge-light) #8d887e #8d887e var(--edge-light);
+  background: linear-gradient(180deg, #ece8de, #d7d2c8);
+}
+
+.deck-io summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.deck-io .field-label {
+  margin-top: 12px;
+  margin-bottom: 5px;
+}
+
+.deck-io textarea {
+  width: 100%;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #f4f0e7;
+  border: 2px solid;
+  border-color: #8b867c #ffffff #ffffff #8b867c;
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.2);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.deck-io .button-row {
+  margin-top: 10px;
+}
+
 .deck-cards {
   display: grid;
   gap: 8px;

@@ -162,6 +162,34 @@ width is remembered for next time. You can also move it with the arrow keys.
 Decks work without an account too. They then live in your browser and move up
 to your account the first time you log in.
 
+### Import and export
+
+Under "Import und Export" in the deck window you can paste or copy a plain
+card list. One card per line, the number first:
+
+```
+1 Commodore Guff
+1 Sol Ring
+1 Preordain
+```
+
+This is the same format Moxfield and Arena use, so lists move between them
+without editing. While reading a list:
+
+- Lines starting with `//` or `#` and empty lines are skipped.
+- A set in brackets like `1 Sol Ring (LEA) 269` is ignored, only the name
+  counts.
+- `1x Preordain` works, and a line with no number at all counts as one.
+- Names are looked up 75 at a time in one request. Anything that does not
+  match exactly gets a second try with a tolerant search, so small typos still
+  land. What is left over is named in the status line.
+- If the deck has no commander yet, the first card that is allowed to be one
+  becomes it. That covers legendary creatures and cards that say they can be
+  your commander, like the planeswalker Commodore Guff.
+
+Export writes the commander first, so an exported deck can be read back in
+unchanged.
+
 ## Not done yet
 
 - No card legality or deck size checks yet, so nothing stops you from putting
