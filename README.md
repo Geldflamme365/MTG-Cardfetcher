@@ -7,6 +7,10 @@ prints of the same card, and keep your own collection.
 Without an account, everything stays in your browser. With an account, your
 collection is saved on Cloudflare, so it is the same on every device.
 
+The start page has a "Random Commander" button next to "Random Card". It pulls
+a random card that is allowed to lead a deck, planeswalker commanders
+included.
+
 You can try it right now at
 <https://mtg-remasurium.t-ackeret-inf24.workers.dev>. It is still in
 development, so things can change.
@@ -164,8 +168,9 @@ to your account the first time you log in.
 
 ### Import and export
 
-Under "Import und Export" in the deck window you can paste or copy a plain
-card list. One card per line, the number first:
+Import sits in the deck overview and always makes a new deck. Export sits in
+the deck window and writes out the deck you have open. Both use the same plain
+card list, one card per line with the number first:
 
 ```
 1 Commodore Guff
@@ -183,9 +188,12 @@ without editing. While reading a list:
 - Names are looked up 75 at a time in one request. Anything that does not
   match exactly gets a second try with a tolerant search, so small typos still
   land. What is left over is named in the status line.
-- If the deck has no commander yet, the first card that is allowed to be one
-  becomes it. That covers legendary creatures and cards that say they can be
-  your commander, like the planeswalker Commodore Guff.
+- The first card that is allowed to be a commander becomes one. That covers
+  legendary creatures and cards that say they can be your commander, like the
+  planeswalker Commodore Guff.
+- You can give the new deck a name. Leave the field empty and it takes the
+  commander's name. Either way the deck opens right after, where the name can
+  be changed at any time.
 
 Export writes the commander first, so an exported deck can be read back in
 unchanged.

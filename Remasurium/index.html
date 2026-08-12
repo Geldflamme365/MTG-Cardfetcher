@@ -51,6 +51,7 @@
               <a class="button-link primary" href="#/suche">Open Search</a>
               <a class="button-link" href="#/collection">Open Collection</a>
               <button type="button" class="retro-button" data-random-card="1">Random Card</button>
+              <button type="button" class="retro-button" id="randomCommanderBtn">Random Commander</button>
             </div>
           </div>
         </article>
@@ -235,6 +236,24 @@
               Formaten wird noch gearbeitet.
             </p>
 
+            <details class="deck-io">
+              <summary>Deck importieren</summary>
+              <label class="field-label" for="deckImportName">Name (optional)</label>
+              <input id="deckImportName" type="text" maxlength="80" placeholder="leer lassen für den Commander-Namen" autocomplete="off" />
+
+              <label class="field-label" for="deckImportText">Kartenliste</label>
+              <textarea id="deckImportText" rows="8" spellcheck="false" placeholder="1 Commodore Guff&#10;1 Sol Ring&#10;1 Preordain"></textarea>
+              <div class="button-row">
+                <button type="button" id="deckImportBtn" class="retro-button">Als neues Deck importieren</button>
+              </div>
+              <p class="small-note">
+                Eine Karte pro Zeile, davor die Anzahl. Set-Angaben in Klammern und
+                Kommentarzeilen werden überlesen. Die erste Karte, die Commander
+                sein darf, wird dazu. Danach öffnet sich das Deck, wo du den Namen
+                jederzeit ändern kannst.
+              </p>
+            </details>
+
             <div class="status-wrap">
               <span class="field-label">Status</span>
               <div id="deckStatus" class="status muted">Bereit.</div>
@@ -295,18 +314,16 @@
               <p class="small-note">Nimmt den besten Treffer zum Namen, auch bei kleinen Tippfehlern.</p>
 
               <details class="deck-io">
-                <summary>Import und Export</summary>
+                <summary>Deck exportieren</summary>
                 <label class="field-label" for="deckListText">Kartenliste</label>
-                <textarea id="deckListText" rows="8" spellcheck="false" placeholder="1 Commodore Guff&#10;1 Sol Ring&#10;1 Preordain"></textarea>
+                <textarea id="deckListText" rows="8" spellcheck="false" readonly placeholder="Auf Exportieren klicken"></textarea>
                 <div class="button-row">
                   <button type="button" id="deckExportBtn" class="retro-button">Exportieren</button>
-                  <button type="button" id="deckImportBtn" class="retro-button">Importieren</button>
                   <button type="button" id="deckCopyBtn" class="retro-button">Kopieren</button>
                 </div>
                 <p class="small-note">
-                  Eine Karte pro Zeile, davor die Anzahl. Set-Angaben in Klammern
-                  werden überlesen. Ist noch kein Commander gewählt, wird die erste
-                  Karte der Liste dazu, die Commander sein darf.
+                  Eine Karte pro Zeile, davor die Anzahl. Der Commander steht vorn,
+                  damit sich die Liste unverändert wieder einlesen lässt.
                 </p>
               </details>
 

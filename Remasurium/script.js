@@ -92,8 +92,11 @@ const els = {
   quickAddBtn: document.getElementById("quickAddBtn"),
   deckListText: document.getElementById("deckListText"),
   deckExportBtn: document.getElementById("deckExportBtn"),
-  deckImportBtn: document.getElementById("deckImportBtn"),
   deckCopyBtn: document.getElementById("deckCopyBtn"),
+  deckImportBtn: document.getElementById("deckImportBtn"),
+  deckImportText: document.getElementById("deckImportText"),
+  deckImportName: document.getElementById("deckImportName"),
+  randomCommanderBtn: document.getElementById("randomCommanderBtn"),
   navLinks: document.querySelectorAll(".nav-link"),
   authStatus: document.getElementById("authStatus"),
   accountGuest: document.getElementById("accountGuest"),
@@ -348,9 +351,10 @@ async function fetchJson(url, options = {}) {
   return response.json();
 }
 
-async function fetchRandomCard() {
+async function fetchRandomCard(query = "") {
   const nonce = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return fetchJson(`https://api.scryfall.com/cards/random?__cb=${encodeURIComponent(nonce)}`, {
+  const filter = query ? `q=${encodeURIComponent(query)}&` : "";
+  return fetchJson(`https://api.scryfall.com/cards/random?${filter}__cb=${encodeURIComponent(nonce)}`, {
     cache: "no-store"
   });
 }
@@ -1090,6 +1094,24 @@ async function loadRandomCard() {
   }
 }
 
+// is:commander deckt bei Scryfall genau die Karten ab, die Commander
+// sein dürfen: legendäre Kreaturen und die Planeswalker und Karten, die
+// es ausdrücklich erlauben.
+async function loadRandomCommander() {
+  openSearchRoute();
+  setStatus("Ziehe zufälligen Commander...", "muted");
+
+  try {
+    const card = await fetchRandomCard("is:commander");
+    state.results = [card];
+    renderResults();
+    await selectSearchCard(card);
+    setStatus(`Zufälliger Commander: ${card.name}`, "ok");
+  } catch (error) {
+    setStatus(`Commander konnte nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
 function bindQueryButtons() {
   els.queryButtons.forEach((button) => {
     button.addEventListener("click", async () => {
@@ -1772,12 +1794,12 @@ async function lookupCardsByName(names) {
   return { found, missing };
 }
 
-async function importDeckList() {
+async function importDeckList(text) {
   if (!state.activeDeck) {
     return;
   }
 
-  const entries = parseDeckList(els.deckListText.value);
+  const entries = parseDeckList(text);
   if (!entries.length) {
     setDeckStatus("Die Liste ist leer.", "err");
     return;
@@ -1844,6 +1866,47 @@ async function importDeckList() {
 
   const problem = stillMissing.length ? ` Nicht gefunden: ${stillMissing.join(", ")}.` : "";
   setDeckStatus(`${added} von ${entries.length} Karten übernommen.${problem}`, stillMissing.length ? "err" : "ok");
+  return { added, total: entries.length, missing: stillMissing };
+}
+
+// Import läuft in der Übersicht und legt immer ein neues Deck an.
+async function importDeckAsNew() {
+  const text = els.deckImportText.value;
+  const entries = parseDeckList(text);
+
+  if (!entries.length) {
+    setDeckStatus("Die Liste ist leer.", "err");
+    return;
+  }
+
+  const wunschname = els.deckImportName.value.trim();
+  setDeckStatus(`Lege Deck an und lese ${entries.length} Zeilen...`, "muted");
+
+  try {
+    const deck = await deckStore.create(wunschname || "Importiertes Deck");
+    await openDeck(deck.id);
+    const result = await importDeckList(text);
+
+    // Ohne eigenen Namen bekommt das Deck den seines Commanders, das ist
+    // brauchbarer als "Importiertes Deck".
+    if (!wunschname && state.activeDeck?.commander) {
+      applyDeckResult(
+        await deckStore.update(state.activeDeck.id, { name: state.activeDeck.commander.name })
+      );
+      await refreshDecks();
+    }
+
+    els.deckImportText.value = "";
+    els.deckImportName.value = "";
+
+    const problem = result?.missing.length ? ` Nicht gefunden: ${result.missing.join(", ")}.` : "";
+    setDeckStatus(
+      `Deck "${state.activeDeck.name}" angelegt, ${result?.added ?? 0} von ${entries.length} Karten übernommen.${problem}`,
+      result?.missing.length ? "err" : "ok"
+    );
+  } catch (error) {
+    setDeckStatus(`Import fehlgeschlagen: ${error.message}`, "err");
+  }
 }
 
 function renderDeckCardDetails() {
@@ -2268,8 +2331,9 @@ els.quickAddInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") quickAdd();
 });
 els.deckExportBtn.addEventListener("click", exportDeckList);
-els.deckImportBtn.addEventListener("click", importDeckList);
 els.deckCopyBtn.addEventListener("click", copyDeckList);
+els.deckImportBtn.addEventListener("click", importDeckAsNew);
+els.randomCommanderBtn.addEventListener("click", loadRandomCommander);
 
 els.authTabs.forEach((tab) => {
   tab.addEventListener("click", () => showAuthTab(tab.dataset.authTab));
