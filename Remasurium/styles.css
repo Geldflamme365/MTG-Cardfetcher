@@ -767,6 +767,7 @@ body.is-splitting {
 }
 
 .deck-tile {
+  position: relative;
   display: grid;
   gap: 0;
   padding: 0;
@@ -776,11 +777,64 @@ body.is-splitting {
   background: linear-gradient(180deg, #ece8de, #d7d2c8);
   border: 2px solid;
   border-color: var(--edge-light) #615d54 #615d54 var(--edge-light);
+}
+
+.deck-tile-open {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  font: inherit;
   cursor: pointer;
 }
 
 .deck-tile:hover {
   filter: brightness(1.03);
+}
+
+/* Der Stift bleibt unsichtbar, bis man die Kachel berührt. Über
+   :focus-within ist er auch mit der Tastatur erreichbar. */
+.deck-tile-rename {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 2px 6px;
+  opacity: 0;
+  color: var(--ink);
+  background: linear-gradient(180deg, #efebe1, #cbc6bc);
+  border: 2px solid;
+  border-color: var(--edge-light) #615d54 #615d54 var(--edge-light);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.deck-tile:hover .deck-tile-rename,
+.deck-tile:focus-within .deck-tile-rename {
+  opacity: 1;
+}
+
+.deck-tile-rename:hover {
+  filter: brightness(1.06);
+}
+
+.deck-rename-input {
+  min-height: 32px;
+  padding: 4px 6px;
+  font-size: 0.9rem;
+}
+
+.deck-tile.is-renaming {
+  outline: 2px solid #9e87e2;
+  outline-offset: -2px;
 }
 
 .deck-tile img {

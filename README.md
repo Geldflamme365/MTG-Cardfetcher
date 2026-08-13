@@ -9,7 +9,9 @@ collection is saved on Cloudflare, so it is the same on every device.
 
 The start page has a "Random Commander" button next to "Random Card". It pulls
 a random card that is allowed to lead a deck, planeswalker commanders
-included.
+included, and opens it. The search page has the same thing as a suggestion
+button, but there the card only drops into the result list without opening
+anything.
 
 You can try it right now at
 <https://mtg-remasurium.t-ackeret-inf24.workers.dev>. It is still in
@@ -135,6 +137,11 @@ In a Commander deck you may only keep one copy of a card. Two kinds of cards
 are free of that rule: basic lands, and cards that say "A deck can have any
 number of cards named ...", like Relentless Rats. For those the `+` button
 stays usable. The commander itself counts as one of the cards in the deck.
+
+Hovering a deck in the overview shows a small pencil in its corner. It turns
+the name into a text field, so a deck can be renamed without opening it. Enter
+saves, Escape cancels, and clicking somewhere else saves as well. The name can
+also be changed in the deck window at any time.
 
 Click a deck to open the editor. It has two windows side by side: card search
 on the left, the deck itself on the right. Drag the bar between them to make

@@ -17,6 +17,7 @@ const state = {
   activeDeckCards: [],
   deckResults: [],
   deckVersionCard: null,
+  renamingDeckId: null,
   deckSelection: null,
   deckPrints: [],
   deckFaceIndex: 0,
@@ -97,6 +98,7 @@ const els = {
   deckImportText: document.getElementById("deckImportText"),
   deckImportName: document.getElementById("deckImportName"),
   randomCommanderBtn: document.getElementById("randomCommanderBtn"),
+  randomCommanderPill: document.getElementById("randomCommanderPill"),
   navLinks: document.querySelectorAll(".nav-link"),
   authStatus: document.getElementById("authStatus"),
   accountGuest: document.getElementById("accountGuest"),
@@ -1112,6 +1114,25 @@ async function loadRandomCommander() {
   }
 }
 
+// Wie loadRandomCommander, aber ohne die Detailansicht aufzureissen:
+// Die Karte landet nur in der Trefferliste.
+async function searchRandomCommander() {
+  openSearchRoute();
+  setStatus("Ziehe zufälligen Commander...", "muted");
+
+  try {
+    const card = await fetchRandomCard("is:commander");
+    state.results = [card];
+    state.searchSelection = null;
+    state.searchPrints = [];
+    renderResults();
+    renderSearchDetails();
+    setStatus(`Zufälliger Commander: ${card.name}`, "ok");
+  } catch (error) {
+    setStatus(`Commander konnte nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
 function bindQueryButtons() {
   els.queryButtons.forEach((button) => {
     button.addEventListener("click", async () => {
@@ -1268,31 +1289,116 @@ function renderDeckList() {
     return;
   }
 
+  const bild = (deck) =>
+    deck.commander?.art || deck.commander?.image
+      ? `<img class="${deck.commander.art ? "" : "is-full-card"}" src="${escapeHtml(
+          deck.commander.art || deck.commander.image
+        )}" alt="Artwork von ${escapeHtml(deck.commander.name || "")}" loading="lazy" />`
+      : `<span class="deck-tile-empty">Kein Commander gewählt</span>`;
+
   els.deckList.innerHTML = decks
-    .map(
-      (deck) => `
-        <button type="button" class="deck-tile" data-deck="${escapeHtml(deck.id)}" title="${escapeHtml(deck.name)}">
-          ${
-            deck.commander?.art || deck.commander?.image
-              ? `<img class="${deck.commander.art ? "" : "is-full-card"}" src="${escapeHtml(
-                  deck.commander.art || deck.commander.image
-                )}" alt="Artwork von ${escapeHtml(deck.commander.name || "")}" loading="lazy" />`
-              : `<span class="deck-tile-empty">Kein Commander gewählt</span>`
-          }
-          <span class="deck-tile-body">
-            <strong>${escapeHtml(deck.name)}</strong>
-            <span>${deck.cardCount} ${deck.cardCount === 1 ? "Karte" : "Karten"}${
-              deck.commander ? ` · ${escapeHtml(deck.commander.name)}` : ""
-            }</span>
-          </span>
-        </button>
-      `
-    )
+    .map((deck) => {
+      const info = `${deck.cardCount} ${deck.cardCount === 1 ? "Karte" : "Karten"}${
+        deck.commander ? ` · ${escapeHtml(deck.commander.name)}` : ""
+      }`;
+
+      // Beim Umbenennen tritt an die Stelle des Namens ein Eingabefeld.
+      // Der Öffnen-Knopf entfällt so lange, damit ein Klick ins Feld
+      // nicht das Deck aufmacht.
+      if (state.renamingDeckId === deck.id) {
+        return `
+          <div class="deck-tile is-renaming">
+            <span class="deck-tile-open">${bild(deck)}</span>
+            <span class="deck-tile-body">
+              <input class="deck-rename-input" type="text" maxlength="80" value="${escapeHtml(deck.name)}" aria-label="Deckname" />
+              <span>${info}</span>
+            </span>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="deck-tile">
+          <button type="button" class="deck-tile-open" data-deck="${escapeHtml(deck.id)}" title="${escapeHtml(deck.name)} öffnen">
+            ${bild(deck)}
+            <span class="deck-tile-body">
+              <strong>${escapeHtml(deck.name)}</strong>
+              <span>${info}</span>
+            </span>
+          </button>
+          <button type="button" class="deck-tile-rename" data-rename="${escapeHtml(deck.id)}" title="Deck umbenennen" aria-label="${escapeHtml(deck.name)} umbenennen">✎</button>
+        </div>
+      `;
+    })
     .join("");
 
   for (const tile of els.deckList.querySelectorAll("button[data-deck]")) {
     tile.addEventListener("click", () => openDeck(tile.dataset.deck));
   }
+
+  for (const btn of els.deckList.querySelectorAll("button[data-rename]")) {
+    btn.addEventListener("click", () => {
+      state.renamingDeckId = btn.dataset.rename;
+      renderDeckList();
+    });
+  }
+
+  const input = els.deckList.querySelector(".deck-rename-input");
+  if (input) {
+    bindRenameInput(input);
+  }
+}
+
+function bindRenameInput(input) {
+  const deckId = state.renamingDeckId;
+  let erledigt = false;
+
+  input.focus();
+  input.select();
+
+  const abbrechen = () => {
+    if (erledigt) {
+      return;
+    }
+    erledigt = true;
+    state.renamingDeckId = null;
+    renderDeckList();
+  };
+
+  const speichern = async () => {
+    if (erledigt) {
+      return;
+    }
+    erledigt = true;
+
+    const name = input.value.trim();
+    state.renamingDeckId = null;
+
+    if (!name || name === state.decks.find((deck) => deck.id === deckId)?.name) {
+      renderDeckList();
+      return;
+    }
+
+    try {
+      await deckStore.update(deckId, { name });
+      await refreshDecks();
+      setDeckStatus(`Deck heisst jetzt "${name}".`, "ok");
+    } catch (error) {
+      renderDeckList();
+      setDeckStatus(error.message, "err");
+    }
+  };
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      speichern();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      abbrechen();
+    }
+  });
+  input.addEventListener("blur", speichern);
 }
 
 async function refreshDecks() {
@@ -2334,6 +2440,7 @@ els.deckExportBtn.addEventListener("click", exportDeckList);
 els.deckCopyBtn.addEventListener("click", copyDeckList);
 els.deckImportBtn.addEventListener("click", importDeckAsNew);
 els.randomCommanderBtn.addEventListener("click", loadRandomCommander);
+els.randomCommanderPill.addEventListener("click", searchRandomCommander);
 
 els.authTabs.forEach((tab) => {
   tab.addEventListener("click", () => showAuthTab(tab.dataset.authTab));
