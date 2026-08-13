@@ -205,7 +205,22 @@ without editing. While reading a list:
 Export writes the commander first, so an exported deck can be read back in
 unchanged.
 
+### Rules check
+
+Next to "Delete deck" the editor shows whether the deck is legal. Red-orange
+"not legal" means something is off; click it and a window lists what. Green
+"legal" means the deck passes. Checked are:
+
+- exactly 100 cards, the commander counted among them
+- one copy of each card, apart from basic lands and cards like Relentless Rats
+- cards banned or not allowed in Commander
+
+The ban list is not kept in this project. Card legality comes from Scryfall and
+is remembered per card, so the check costs at most one request per new card. If
+Scryfall cannot be reached, size and copies are still checked and only the ban
+list is skipped.
+
 ## Not done yet
 
-- No card legality or deck size checks yet, so nothing stops you from putting
-  a card in a deck where it is not allowed.
+- The rules check knows nothing about the commander's colour identity yet, so
+  a card outside its colours is not flagged.

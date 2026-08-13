@@ -125,6 +125,27 @@ const EN = {
   "Eine Karte pro Zeile, davor die Anzahl. Der Commander steht vorn, damit sich die Liste unverändert wieder einlesen lässt.":
     "One card per line, the number first. The commander goes first so the list can be read back unchanged.",
   "Die Liste ist leer.": "The list is empty.",
+
+  // Regelprüfung
+  "legal": "legal",
+  "nicht legal": "not legal",
+  "wird geprüft": "checking",
+  "Regelprüfung anzeigen": "Show the rules check",
+  "regelprüfung commander": "commander rules check",
+  "Das Deck erfüllt die Commander-Regeln.": "The deck meets the Commander rules.",
+  "{count} Punkte sprechen gegen ein legales Commander-Deck.":
+    "{count} things stand in the way of a legal Commander deck.",
+  "Dem Deck fehlt ein Commander.": "The deck has no commander.",
+  "Das Deck hat {count} Karten, es fehlen {diff} auf 100.":
+    "The deck has {count} cards, {diff} short of 100.",
+  "Das Deck hat {count} Karten, {diff} zu viel für 100.":
+    "The deck has {count} cards, {diff} too many for 100.",
+  "{name}: {count} Exemplare, erlaubt ist eines.":
+    "{name}: {count} copies, only one is allowed.",
+  "{name} ist im Commander verboten.": "{name} is banned in Commander.",
+  "{name} ist im Commander nicht zugelassen.": "{name} is not allowed in Commander.",
+  "Geprüft werden die Deckgrösse von genau 100 Karten inklusive Commander, ein Exemplar je Karte ausser bei Standardländern und Relentless-Karten, sowie im Commander verbotene Karten.":
+    "Checked are the deck size of exactly 100 cards including the commander, one copy of each card apart from basic lands and Relentless cards, and cards banned in Commander.",
   "Kreaturen": "Creatures",
   "Spells": "Spells",
   "Kartenziehen": "Card draw",

@@ -279,6 +279,7 @@
                 <button id="backToDecksBtn" type="button" class="retro-button">Zurück zur Übersicht</button>
                 <button id="openExportBtn" type="button" class="retro-button">Deck exportieren</button>
                 <button id="deleteDeckBtn" type="button" class="retro-button">Deck löschen</button>
+                <button id="legalityBadge" type="button" class="legality-badge" title="Regelprüfung anzeigen">wird geprüft</button>
               </div>
 
               <label class="field-label" for="deckNameInput">Deckname</label>
@@ -465,6 +466,24 @@
         <button id="modalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
       </div>
       <div id="searchDetails" class="modal-body muted">Noch keine Karte ausgewählt.</div>
+    </div>
+  </div>
+
+  <div id="legalityModal" class="modal" aria-hidden="true">
+    <div class="modal-dialog window modal-narrow" role="dialog" aria-modal="true" aria-label="Regelprüfung">
+      <div class="title-bar">
+        <span>regelprüfung commander</span>
+        <button id="legalityModalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
+      </div>
+      <div class="modal-body">
+        <div id="legalitySummary" class="status muted">wird geprüft</div>
+        <ul id="legalityList" class="legality-list"></ul>
+        <p class="small-note">
+          Geprüft werden die Deckgrösse von genau 100 Karten inklusive Commander,
+          ein Exemplar je Karte ausser bei Standardländern und Relentless-Karten,
+          sowie im Commander verbotene Karten.
+        </p>
+      </div>
     </div>
   </div>
 

@@ -19,6 +19,7 @@ const state = {
   deckResults: [],
   deckVersionCard: null,
   renamingDeckId: null,
+  deckProblems: [],
   deckSelection: null,
   deckPrints: [],
   deckFaceIndex: 0,
@@ -94,6 +95,11 @@ const els = {
   deckListText: document.getElementById("deckListText"),
   deckCopyBtn: document.getElementById("deckCopyBtn"),
   deckImportBtn: document.getElementById("deckImportBtn"),
+  legalityBadge: document.getElementById("legalityBadge"),
+  legalityModal: document.getElementById("legalityModal"),
+  legalityModalCloseBtn: document.getElementById("legalityModalCloseBtn"),
+  legalitySummary: document.getElementById("legalitySummary"),
+  legalityList: document.getElementById("legalityList"),
   deckImportText: document.getElementById("deckImportText"),
   deckImportName: document.getElementById("deckImportName"),
   randomCommanderBtn: document.getElementById("randomCommanderBtn"),
@@ -1760,6 +1766,125 @@ async function updateDeckQueries() {
   }
 }
 
+// Regelprüfung für das Commander-Format.
+//
+// Deckgrösse und Mengen stehen lokal zur Verfügung. Ob eine Karte
+// verboten ist, weiss nur Scryfall, deshalb wird die Legalität einmal je
+// Karte geholt und gemerkt.
+const COMMANDER_DECK_SIZE = 100;
+const legalityCache = new Map();
+
+async function ensureLegality(ids) {
+  const fehlende = [...new Set(ids)].filter((id) => id && !legalityCache.has(id));
+  if (!fehlende.length) {
+    return;
+  }
+
+  for (let i = 0; i < fehlende.length; i += 75) {
+    const teil = fehlende.slice(i, i + 75);
+    const response = await scryfallFetch("https://api.scryfall.com/cards/collection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifiers: teil.map((id) => ({ id })) })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    for (const card of data.data || []) {
+      legalityCache.set(card.id, card.legalities?.commander || "unknown");
+    }
+    // Was Scryfall nicht kennt, wird nicht als Fehler gewertet.
+    for (const id of teil) {
+      if (!legalityCache.has(id)) {
+        legalityCache.set(id, "unknown");
+      }
+    }
+  }
+}
+
+function collectDeckProblems() {
+  const probleme = [];
+  const karten = state.activeDeckCards;
+  const commander = state.activeDeck?.commander;
+  const gesamt = karten.reduce((summe, karte) => summe + karte.quantity, 0) + (commander ? 1 : 0);
+
+  if (!commander) {
+    probleme.push(t("Dem Deck fehlt ein Commander."));
+  }
+
+  if (gesamt < COMMANDER_DECK_SIZE) {
+    probleme.push(
+      t("Das Deck hat {count} Karten, es fehlen {diff} auf 100.", {
+        count: gesamt,
+        diff: COMMANDER_DECK_SIZE - gesamt
+      })
+    );
+  } else if (gesamt > COMMANDER_DECK_SIZE) {
+    probleme.push(
+      t("Das Deck hat {count} Karten, {diff} zu viel für 100.", {
+        count: gesamt,
+        diff: gesamt - COMMANDER_DECK_SIZE
+      })
+    );
+  }
+
+  for (const karte of karten) {
+    if (karte.quantity > 1 && !karte.unlimited) {
+      probleme.push(
+        t("{name}: {count} Exemplare, erlaubt ist eines.", { name: karte.name, count: karte.quantity })
+      );
+    }
+  }
+
+  for (const karte of [commander, ...karten].filter(Boolean)) {
+    const status = legalityCache.get(karte.id);
+    if (status === "banned") {
+      probleme.push(t("{name} ist im Commander verboten.", { name: karte.name }));
+    } else if (status === "not_legal") {
+      probleme.push(t("{name} ist im Commander nicht zugelassen.", { name: karte.name }));
+    }
+  }
+
+  return probleme;
+}
+
+function renderLegality(probleme) {
+  state.deckProblems = probleme;
+
+  const inOrdnung = probleme.length === 0;
+  els.legalityBadge.textContent = inOrdnung ? t("legal") : t("nicht legal");
+  els.legalityBadge.classList.toggle("is-legal", inOrdnung);
+  els.legalityBadge.classList.toggle("is-illegal", !inOrdnung);
+
+  els.legalitySummary.textContent = inOrdnung
+    ? t("Das Deck erfüllt die Commander-Regeln.")
+    : t("{count} Punkte sprechen gegen ein legales Commander-Deck.", { count: probleme.length });
+  els.legalitySummary.className = `status ${inOrdnung ? "ok" : "err"}`;
+
+  els.legalityList.innerHTML = probleme.map((text) => `<li>${escapeHtml(text)}</li>`).join("");
+}
+
+async function checkDeckLegality() {
+  if (!state.activeDeck) {
+    return;
+  }
+
+  // Erst das, was ohne Netz feststeht, damit die Anzeige sofort stimmt.
+  renderLegality(collectDeckProblems());
+
+  const ids = [state.activeDeck.commander?.id, ...state.activeDeckCards.map((karte) => karte.id)];
+  try {
+    await ensureLegality(ids.filter(Boolean));
+    renderLegality(collectDeckProblems());
+  } catch {
+    // Ohne Scryfall bleiben Grösse und Mengen geprüft, verbotene Karten
+    // lassen sich dann nicht beurteilen.
+  }
+}
+
 function renderDeckEditor() {
   if (!state.activeDeck) {
     return;
@@ -1768,6 +1893,7 @@ function renderDeckEditor() {
   renderCommanderSlot();
   renderDeckCards();
   updateDeckQueries();
+  checkDeckLegality();
 }
 
 function applyDeckResult(result) {
@@ -2527,6 +2653,13 @@ els.quickAddInput.addEventListener("keydown", (event) => {
 });
 els.deckCopyBtn.addEventListener("click", copyDeckList);
 els.deckImportBtn.addEventListener("click", importDeckAsNew);
+els.legalityBadge.addEventListener("click", () => openModal(els.legalityModal));
+els.legalityModalCloseBtn.addEventListener("click", () => closeModal(els.legalityModal));
+els.legalityModal.addEventListener("click", (event) => {
+  if (event.target === els.legalityModal) {
+    closeModal(els.legalityModal);
+  }
+});
 els.openImportBtn.addEventListener("click", openImportModal);
 els.openExportBtn.addEventListener("click", openExportModal);
 els.importModalCloseBtn.addEventListener("click", () => closeModal(els.importModal));
@@ -2546,9 +2679,23 @@ function updateLangToggle() {
   els.langToggle.textContent = getLang() === "de" ? "EN" : "DE";
 }
 
+// Texte mit eingesetzten Zahlen oder Namen sind nach dem Zusammenbauen
+// keine Wörterbuch-Schlüssel mehr. Der Textknoten-Durchlauf erreicht sie
+// deshalb nicht, sie müssen neu erzeugt werden.
+function rerenderDynamicText() {
+  renderResults();
+  renderCollection();
+  renderDeckList();
+  renderAccount();
+  if (state.activeDeck) {
+    renderDeckEditor();
+  }
+}
+
 els.langToggle.addEventListener("click", () => {
   setLang(getLang() === "de" ? "en" : "de");
   updateLangToggle();
+  rerenderDynamicText();
 });
 
 els.authTabs.forEach((tab) => {

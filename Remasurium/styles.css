@@ -899,6 +899,50 @@ body.is-splitting {
 .deck-toolbar {
   margin-top: 0;
   margin-bottom: 14px;
+  align-items: center;
+}
+
+/* Nicht als Kasten gestaltet, damit es als Hinweis gelesen wird und
+   nicht als weiterer Knopf neben "Deck löschen". */
+.legality-badge {
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.legality-badge.is-illegal {
+  color: #c2470f;
+}
+
+.legality-badge.is-legal {
+  color: var(--ok);
+}
+
+.legality-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legality-list li {
+  padding: 8px 10px;
+  border: 2px solid;
+  border-color: var(--edge-light) #8d887e #8d887e var(--edge-light);
+  background: #f4f0e7;
+}
+
+.legality-list li::before {
+  content: "✕ ";
+  color: #c2470f;
+  font-weight: 700;
 }
 
 .commander-slot {
