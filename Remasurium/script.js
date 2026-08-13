@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { createDeckStore } from "./decks.js";
+import { getLang, setLang, t, watchForNewContent } from "./i18n.js";
 
 const state = {
   results: [],
@@ -35,7 +36,6 @@ const selectionCounters = {
 
 const els = {
   status: document.getElementById("status"),
-  routeAddress: document.getElementById("routeAddress"),
   routeFooter: document.getElementById("routeFooter"),
   searchInput: document.getElementById("searchInput"),
   searchBtn: document.getElementById("searchBtn"),
@@ -92,13 +92,19 @@ const els = {
   quickAddInput: document.getElementById("quickAddInput"),
   quickAddBtn: document.getElementById("quickAddBtn"),
   deckListText: document.getElementById("deckListText"),
-  deckExportBtn: document.getElementById("deckExportBtn"),
   deckCopyBtn: document.getElementById("deckCopyBtn"),
   deckImportBtn: document.getElementById("deckImportBtn"),
   deckImportText: document.getElementById("deckImportText"),
   deckImportName: document.getElementById("deckImportName"),
   randomCommanderBtn: document.getElementById("randomCommanderBtn"),
   randomCommanderPill: document.getElementById("randomCommanderPill"),
+  langToggle: document.getElementById("langToggle"),
+  openImportBtn: document.getElementById("openImportBtn"),
+  openExportBtn: document.getElementById("openExportBtn"),
+  importModal: document.getElementById("importModal"),
+  exportModal: document.getElementById("exportModal"),
+  importModalCloseBtn: document.getElementById("importModalCloseBtn"),
+  exportModalCloseBtn: document.getElementById("exportModalCloseBtn"),
   navLinks: document.querySelectorAll(".nav-link"),
   authStatus: document.getElementById("authStatus"),
   accountGuest: document.getElementById("accountGuest"),
@@ -207,12 +213,7 @@ function updateRouteChrome(route) {
     decks: "scry://remasurium/decks",
     account: "scry://remasurium/account"
   };
-  const label = labels[route] || labels.home;
-
-  if (els.routeAddress) {
-    els.routeAddress.textContent = label;
-  }
-  if (els.routeFooter) {
+  const label = labels[route] || labels.home;  if (els.routeFooter) {
     els.routeFooter.textContent = label;
   }
 }
@@ -1298,9 +1299,9 @@ function renderDeckList() {
 
   els.deckList.innerHTML = decks
     .map((deck) => {
-      const info = `${deck.cardCount} ${deck.cardCount === 1 ? "Karte" : "Karten"}${
-        deck.commander ? ` · ${escapeHtml(deck.commander.name)}` : ""
-      }`;
+      const info = `${t(deck.cardCount === 1 ? "{count} Karte" : "{count} Karten", {
+        count: deck.cardCount
+      })}${deck.commander ? ` · ${escapeHtml(deck.commander.name)}` : ""}`;
 
       // Beim Umbenennen tritt an die Stelle des Namens ein Eingabefeld.
       // Der Öffnen-Knopf entfällt so lange, damit ein Klick ins Feld
@@ -1439,18 +1440,85 @@ function renderCommanderSlot() {
           ? "Sein Bild steht in der Übersicht für dieses Deck."
           : "Mit dem Stern bei einer Karte im Deck festlegen."
       }</p>
-      ${commander ? `<div class="button-row"><button type="button" id="clearCommanderBtn" class="retro-button">Commander entfernen</button></div>` : ""}
+      ${
+        commander
+          ? `<div class="button-row">
+               <button type="button" id="demoteCommanderBtn" class="retro-button commander-star" title="${t("Als Commander entfernen")}" aria-label="${t("Als Commander entfernen")}">★</button>
+               <button type="button" id="removeCommanderBtn" class="retro-button">Karte entfernen</button>
+             </div>`
+          : ""
+      }
     </div>
   `;
 
-  const clearBtn = els.commanderSlot.querySelector("#clearCommanderBtn");
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => setCommander(null));
+  const demoteBtn = els.commanderSlot.querySelector("#demoteCommanderBtn");
+  if (demoteBtn) {
+    demoteBtn.addEventListener("click", demoteCommander);
+  }
+
+  const removeBtn = els.commanderSlot.querySelector("#removeCommanderBtn");
+  if (removeBtn) {
+    removeBtn.addEventListener("click", removeCommanderCard);
   }
 
   const versionBtn = els.commanderSlot.querySelector("#commanderVersionBtn");
   if (versionBtn) {
     versionBtn.addEventListener("click", () => openCommanderVersionPicker(commander));
+  }
+}
+
+// Den Commander abzusetzen darf die Karte nicht aus dem Deck werfen.
+// Sie wandert zurück in die Kartenliste, denn beim Ernennen war sie von
+// dort gekommen.
+async function demoteCommander() {
+  const commander = state.activeDeck?.commander;
+  if (!commander) {
+    return;
+  }
+
+  setDeckStatus(`Setze ${commander.name} als Commander ab...`, "muted");
+
+  // Die volle Karte liefert Set und Relentless-Eigenschaft für die
+  // Deckzeile. Ohne Netz geht es auch mit dem, was am Deck steht.
+  let entry = {
+    id: commander.id,
+    name: commander.name,
+    set_name: null,
+    image: commander.image ?? null,
+    unlimited: false
+  };
+  try {
+    entry = deckCardFromScryfall(
+      await fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(commander.id)}`)
+    );
+  } catch {
+    // Rückfall auf die gespeicherten Angaben.
+  }
+
+  try {
+    await deckStore.putCard(state.activeDeck.id, entry, 1);
+    applyDeckResult(await deckStore.update(state.activeDeck.id, { commander: null }));
+    await refreshDecks();
+    setDeckStatus(t("{name} steht wieder als Karte im Deck.", { name: commander.name }), "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
+  }
+}
+
+// Nimmt die Karte ganz aus dem Deck, im Gegensatz zum Stern, der sie
+// nur vom Commander-Platz zurück in die Liste schiebt.
+async function removeCommanderCard() {
+  const commander = state.activeDeck?.commander;
+  if (!commander) {
+    return;
+  }
+
+  try {
+    applyDeckResult(await deckStore.update(state.activeDeck.id, { commander: null }));
+    await refreshDecks();
+    setDeckStatus(t("{name} aus dem Deck entfernt.", { name: commander.name }), "ok");
+  } catch (error) {
+    setDeckStatus(error.message, "err");
   }
 }
 
@@ -1494,7 +1562,7 @@ function renderDeckCards() {
   // Der Commander zählt als Karte des Decks mit.
   const total =
     cards.reduce((sum, card) => sum + card.quantity, 0) + (state.activeDeck?.commander ? 1 : 0);
-  els.deckTotal.textContent = `${total} ${total === 1 ? "Karte" : "Karten"}`;
+  els.deckTotal.textContent = t(total === 1 ? "{count} Karte" : "{count} Karten", { count: total });
 
   if (!cards.length) {
     els.deckCards.innerHTML = `<div class="empty-state">Noch keine Karten. Such links eine oder nutze Quick Add.</div>`;
@@ -1835,6 +1903,26 @@ function parseDeckList(text) {
   return entries;
 }
 
+function openModal(element) {
+  element.classList.add("open");
+  element.setAttribute("aria-hidden", "false");
+}
+
+function closeModal(element) {
+  element.classList.remove("open");
+  element.setAttribute("aria-hidden", "true");
+}
+
+function openImportModal() {
+  openModal(els.importModal);
+  els.deckImportName.focus();
+}
+
+function openExportModal() {
+  exportDeckList();
+  openModal(els.exportModal);
+}
+
 function exportDeckList() {
   if (!state.activeDeck) {
     return;
@@ -1849,7 +1937,7 @@ function exportDeckList() {
   }
 
   els.deckListText.value = lines.join("\n");
-  setDeckStatus(`${lines.length} Zeilen exportiert.`, "ok");
+  setDeckStatus(t("{count} Zeilen exportiert.", { count: lines.length }), "ok");
 }
 
 async function copyDeckList() {
@@ -2004,6 +2092,7 @@ async function importDeckAsNew() {
 
     els.deckImportText.value = "";
     els.deckImportName.value = "";
+    closeModal(els.importModal);
 
     const problem = result?.missing.length ? ` Nicht gefunden: ${result.missing.join(", ")}.` : "";
     setDeckStatus(
@@ -2436,11 +2525,31 @@ els.quickAddBtn.addEventListener("click", quickAdd);
 els.quickAddInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") quickAdd();
 });
-els.deckExportBtn.addEventListener("click", exportDeckList);
 els.deckCopyBtn.addEventListener("click", copyDeckList);
 els.deckImportBtn.addEventListener("click", importDeckAsNew);
+els.openImportBtn.addEventListener("click", openImportModal);
+els.openExportBtn.addEventListener("click", openExportModal);
+els.importModalCloseBtn.addEventListener("click", () => closeModal(els.importModal));
+els.exportModalCloseBtn.addEventListener("click", () => closeModal(els.exportModal));
+for (const modal of [els.importModal, els.exportModal]) {
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeModal(modal);
+    }
+  });
+}
 els.randomCommanderBtn.addEventListener("click", loadRandomCommander);
 els.randomCommanderPill.addEventListener("click", searchRandomCommander);
+
+// Sprachumschaltung. Der Knopf zeigt die Sprache, in die er wechselt.
+function updateLangToggle() {
+  els.langToggle.textContent = getLang() === "de" ? "EN" : "DE";
+}
+
+els.langToggle.addEventListener("click", () => {
+  setLang(getLang() === "de" ? "en" : "de");
+  updateLangToggle();
+});
 
 els.authTabs.forEach((tab) => {
   tab.addEventListener("click", () => showAuthTab(tab.dataset.authTab));
@@ -2464,4 +2573,11 @@ renderCollection();
 renderCollectionDetails();
 renderRoute();
 setStatus("Bereit. Gib einen Suchbegriff ein.", "muted");
+
+// Sprache anwenden, bevor der Rest nachlädt. setLang setzt dabei auch
+// das lang-Attribut des Dokuments.
+setLang(getLang());
+updateLangToggle();
+watchForNewContent();
+
 initAuth();

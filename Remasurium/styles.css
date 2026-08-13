@@ -108,11 +108,19 @@ a:visited {
 .menu-bar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 16px;
   padding: 8px 10px;
   background: var(--window-2);
   border-top: 1px solid #f8f5ef;
   border-bottom: 2px solid #8b867c;
+}
+
+/* Schiebt die Sprachumschaltung an den rechten Rand. */
+.lang-toggle {
+  margin-left: auto;
+  min-height: 30px;
+  padding: 3px 12px;
 }
 
 .nav-link {
@@ -322,14 +330,23 @@ a:visited {
 
 .info-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px 12px;
   padding-bottom: 7px;
   border-bottom: 1px dotted #7b756b;
 }
 
 .info-row span {
   color: var(--muted);
+}
+
+/* Lange E-Mail-Adressen dürfen nicht aus dem Kasten laufen. Sie rutschen
+   stattdessen in die nächste Zeile und brechen notfalls im Wort. */
+.info-row strong {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .query-bank {
@@ -905,6 +922,13 @@ body.is-splitting {
   border-color: #8b867c #ffffff #ffffff #8b867c;
 }
 
+.commander-star {
+  min-width: 42px;
+  padding: 7px 10px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
 .commander-empty {
   display: grid;
   place-items: center;
@@ -916,25 +940,15 @@ body.is-splitting {
   border-color: #8b867c #ffffff #ffffff #8b867c;
 }
 
-.deck-io {
+.modal-narrow {
+  width: min(640px, 96vw);
+}
+
+.field-label.spaced {
   margin-top: 14px;
-  padding: 10px;
-  border: 2px solid;
-  border-color: var(--edge-light) #8d887e #8d887e var(--edge-light);
-  background: linear-gradient(180deg, #ece8de, #d7d2c8);
 }
 
-.deck-io summary {
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.deck-io .field-label {
-  margin-top: 12px;
-  margin-bottom: 5px;
-}
-
-.deck-io textarea {
+.modal-body textarea {
   width: 100%;
   padding: 8px 10px;
   color: var(--ink);
@@ -947,8 +961,8 @@ body.is-splitting {
   resize: vertical;
 }
 
-.deck-io .button-row {
-  margin-top: 10px;
+.modal-body .button-row {
+  margin-top: 12px;
 }
 
 .deck-cards {

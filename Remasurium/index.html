@@ -10,7 +10,7 @@
   <main class="desk">
     <header class="window browser-shell">
       <div class="title-bar">
-        <span>remasurium.exe - [scryfall browser shell]</span>
+        <span>MTG Remasurium</span>
         <div class="title-controls" aria-hidden="true">
           <span></span>
           <span></span>
@@ -24,13 +24,8 @@
         <a class="nav-link" href="#/collection">Collection</a>
         <a class="nav-link" href="#/decks">Decks</a>
         <a class="nav-link" href="#/account">Account</a>
+        <button type="button" id="langToggle" class="small-toolbar-button lang-toggle" title="Sprache wechseln">EN</button>
       </nav>
-
-      <div class="address-row">
-        <span class="address-label">Location:</span>
-        <div class="address-field" id="routeAddress">scry://remasurium/home</div>
-        <button type="button" class="small-toolbar-button" data-random-card="1">Random</button>
-      </div>
     </header>
 
     <section id="view-home" class="view">
@@ -220,7 +215,7 @@
           <div class="panel-body">
             <label class="field-label" for="newDeckName">Neues Deck</label>
             <div class="search-row">
-              <input id="newDeckName" type="text" maxlength="80" placeholder="z.B. Atraxa Superfreunde" autocomplete="off" />
+              <input id="newDeckName" type="text" maxlength="80" placeholder="Guff superfriends" autocomplete="off" />
               <button id="createDeckBtn" type="button">Erstellen</button>
             </div>
 
@@ -237,23 +232,9 @@
               Formaten wird noch gearbeitet.
             </p>
 
-            <details class="deck-io">
-              <summary>Deck importieren</summary>
-              <label class="field-label" for="deckImportName">Name (optional)</label>
-              <input id="deckImportName" type="text" maxlength="80" placeholder="leer lassen für den Commander-Namen" autocomplete="off" />
-
-              <label class="field-label" for="deckImportText">Kartenliste</label>
-              <textarea id="deckImportText" rows="8" spellcheck="false" placeholder="1 Commodore Guff&#10;1 Sol Ring&#10;1 Preordain"></textarea>
-              <div class="button-row">
-                <button type="button" id="deckImportBtn" class="retro-button">Als neues Deck importieren</button>
-              </div>
-              <p class="small-note">
-                Eine Karte pro Zeile, davor die Anzahl. Set-Angaben in Klammern und
-                Kommentarzeilen werden überlesen. Die erste Karte, die Commander
-                sein darf, wird dazu. Danach öffnet sich das Deck, wo du den Namen
-                jederzeit ändern kannst.
-              </p>
-            </details>
+            <div class="button-row">
+              <button type="button" id="openImportBtn" class="retro-button">Deck importieren</button>
+            </div>
 
             <div class="status-wrap">
               <span class="field-label">Status</span>
@@ -296,6 +277,7 @@
             <div class="panel-body">
               <div class="button-row deck-toolbar">
                 <button id="backToDecksBtn" type="button" class="retro-button">Zurück zur Übersicht</button>
+                <button id="openExportBtn" type="button" class="retro-button">Deck exportieren</button>
                 <button id="deleteDeckBtn" type="button" class="retro-button">Deck löschen</button>
               </div>
 
@@ -313,20 +295,6 @@
                 <button id="quickAddBtn" type="button">Hinzufügen</button>
               </div>
               <p class="small-note">Nimmt den besten Treffer zum Namen, auch bei kleinen Tippfehlern.</p>
-
-              <details class="deck-io">
-                <summary>Deck exportieren</summary>
-                <label class="field-label" for="deckListText">Kartenliste</label>
-                <textarea id="deckListText" rows="8" spellcheck="false" readonly placeholder="Auf Exportieren klicken"></textarea>
-                <div class="button-row">
-                  <button type="button" id="deckExportBtn" class="retro-button">Exportieren</button>
-                  <button type="button" id="deckCopyBtn" class="retro-button">Kopieren</button>
-                </div>
-                <p class="small-note">
-                  Eine Karte pro Zeile, davor die Anzahl. Der Commander steht vorn,
-                  damit sich die Liste unverändert wieder einlesen lässt.
-                </p>
-              </details>
 
               <div id="deckCards" class="deck-cards"></div>
             </div>
@@ -497,6 +465,53 @@
         <button id="modalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
       </div>
       <div id="searchDetails" class="modal-body muted">Noch keine Karte ausgewählt.</div>
+    </div>
+  </div>
+
+  <div id="importModal" class="modal" aria-hidden="true">
+    <div class="modal-dialog window modal-narrow" role="dialog" aria-modal="true" aria-label="Deck importieren">
+      <div class="title-bar">
+        <span>deck importieren</span>
+        <button id="importModalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label" for="deckImportName">Name (optional)</label>
+        <input id="deckImportName" type="text" maxlength="80" placeholder="Guff superfriends" autocomplete="off" />
+
+        <label class="field-label spaced" for="deckImportText">Kartenliste</label>
+        <textarea id="deckImportText" rows="12" spellcheck="false" placeholder="1 Commodore Guff&#10;1 Sol Ring&#10;1 Preordain"></textarea>
+
+        <div class="button-row">
+          <button type="button" id="deckImportBtn" class="retro-button">Als neues Deck importieren</button>
+        </div>
+        <p class="small-note">
+          Eine Karte pro Zeile, davor die Anzahl. Set-Angaben in Klammern und
+          Kommentarzeilen werden überlesen. Die erste Karte, die Commander sein
+          darf, wird dazu. Danach öffnet sich das Deck, wo du den Namen jederzeit
+          ändern kannst.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div id="exportModal" class="modal" aria-hidden="true">
+    <div class="modal-dialog window modal-narrow" role="dialog" aria-modal="true" aria-label="Deck exportieren">
+      <div class="title-bar">
+        <span>deck exportieren</span>
+        <button id="exportModalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label" for="deckListText">Kartenliste</label>
+        <textarea id="deckListText" rows="14" spellcheck="false" readonly></textarea>
+
+        <div class="button-row">
+          <button type="button" id="deckCopyBtn" class="retro-button">Kopieren</button>
+        </div>
+        <p class="small-note">
+          Eine Karte pro Zeile, davor die Anzahl. Der Commander steht vorn, damit
+          sich die Liste unverändert wieder einlesen lässt.
+        </p>
+      </div>
     </div>
   </div>
 
