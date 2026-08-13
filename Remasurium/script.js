@@ -1124,12 +1124,16 @@ async function loadRandomCard() {
 // is:commander deckt bei Scryfall genau die Karten ab, die Commander
 // sein dürfen: legendäre Kreaturen und die Planeswalker und Karten, die
 // es ausdrücklich erlauben.
+//
+// game:paper hält die reinen Digitalkarten heraus, also die Alchemy-
+// Varianten mit A- im Namen und Arena-eigene Karten. Auf Papier gibt es
+// rund 3550 mögliche Commander, mit den digitalen wären es 3680.
 async function loadRandomCommander() {
   openSearchRoute();
   setStatus("Ziehe zufälligen Commander...", "muted");
 
   try {
-    const card = await fetchRandomCard("is:commander");
+    const card = await fetchRandomCard("is:commander game:paper");
     state.results = [card];
     renderResults();
     await selectSearchCard(card);
@@ -1146,7 +1150,7 @@ async function searchRandomCommander() {
   setStatus("Ziehe zufälligen Commander...", "muted");
 
   try {
-    const card = await fetchRandomCard("is:commander");
+    const card = await fetchRandomCard("is:commander game:paper");
     state.results = [card];
     state.searchSelection = null;
     state.searchPrints = [];
