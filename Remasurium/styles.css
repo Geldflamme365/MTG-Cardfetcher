@@ -808,68 +808,87 @@ input::placeholder {
   gap: 8px;
 }
 
-.deck-group-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
+/* Stapelansicht: Die Karten einer Kategorie liegen untereinander und
+   überdecken sich bis auf den Namensbalken. Das Mass ist ein Prozentsatz
+   der Spaltenbreite, damit der sichtbare Streifen bei jeder Breite gleich
+   viel vom Kartenrahmen zeigt (Name links, Manakosten rechts). */
+.deck-group-stack {
+  display: flow-root;
 }
 
-/* Kachelansicht: Das Kartenbild trägt die Bedienelemente, sie liegen
-   halbdurchsichtig darüber und werden beim Überfahren deutlich. */
 .deck-card-tile {
   position: relative;
+  transition: margin-top 140ms ease;
 }
 
-.deck-tile-actions {
+.deck-card-tile + .deck-card-tile {
+  margin-top: -122.9%;
+}
+
+/* Die überfahrene Karte schiebt nur ihre direkte Nachfolgerin weg; alle
+   weiteren hängen an deren Rand und rutschen automatisch mit. Der kleine
+   Rest Abstand trennt die aufgeklappte Karte sichtbar vom Stapel. */
+.deck-card-tile:hover + .deck-card-tile,
+.deck-card-tile:focus-within + .deck-card-tile {
+  margin-top: 6px;
+}
+
+/* Während die Nachfolgerin wegrutscht, muss die aufgeklappte Karte
+   oben liegen, sonst wandert die andere kurz darüber. */
+.deck-card-tile:hover,
+.deck-card-tile:focus-within {
+  z-index: 2;
+}
+
+/* Die Knöpfe liegen dezent auf dem Bild und werden erst beim Überfahren
+   der Karte deutlich. */
+/* Zwei Klassen tief, damit die Werte gegen .deck-card-actions weiter
+   unten in der Datei gewinnen. */
+.deck-card-tile .deck-tile-actions {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: 26px;
-  justify-content: center;
+  top: 40%;
+  right: 5px;
+  flex-direction: column;
+  align-items: stretch;
   gap: 2px;
   padding: 3px;
-  background: rgba(12, 8, 24, 0.55);
-  opacity: 0.55;
-  transition: opacity 120ms ease;
+  background: rgba(12, 8, 24, 0.28);
+  opacity: 0.3;
+  transition: opacity 120ms ease, background-color 120ms ease;
 }
 
 .deck-card-tile:hover .deck-tile-actions,
 .deck-card-tile:focus-within .deck-tile-actions {
-  opacity: 1;
-  background: rgba(12, 8, 24, 0.82);
+  opacity: 0.92;
+  background: rgba(12, 8, 24, 0.6);
 }
 
-.deck-tile-actions button {
-  min-width: 24px;
+.deck-card-tile .deck-tile-actions button {
+  min-width: 26px;
   min-height: 24px;
   padding: 0 4px;
   font-size: 0.8rem;
 }
 
-.deck-tile-actions .quantity {
+.deck-card-tile .deck-tile-actions .quantity {
   min-width: 18px;
   color: #fff;
+  text-align: center;
   font-size: 0.8rem;
 }
 
+/* Nur bei mehreren Exemplaren, damit der Namensbalken frei bleibt. */
 .deck-tile-count {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  padding: 2px 6px;
+  top: 2%;
+  left: 0;
+  padding: 1px 5px;
   color: #fff;
   background: rgba(12, 8, 24, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.35);
   font-weight: 700;
-  font-size: 0.8rem;
-}
-
-.deck-tile-name {
-  display: block;
-  padding: 4px 2px 0;
-  font-size: 0.78rem;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  line-height: 1.3;
 }
 
 .deck-splitter {
@@ -1190,6 +1209,18 @@ body.is-splitting {
   margin-top: 14px;
   max-height: 420px;
   overflow-y: auto;
+}
+
+/* Eingeklappt wird jede Kartentyp-Gruppe zu einer eigenen Spalte. */
+.deck-cards.is-grid {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  align-items: start;
+  gap: 16px;
+  max-height: 72vh;
+}
+
+.deck-cards.is-grid .deck-group + .deck-group {
+  margin-top: 0;
 }
 
 .deck-card-row {

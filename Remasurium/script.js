@@ -1670,14 +1670,14 @@ function renderDeckCards() {
     </div>
   `;
 
-  // Eingeklappt steht mehr Platz zur Verfügung, dann werden die Karten
-  // als Bilder gezeigt und die Knöpfe liegen halbdurchsichtig darauf.
+  // Eingeklappt steht mehr Platz zur Verfügung. Dann liegen die Karten einer
+  // Kategorie als Stapel untereinander: sichtbar bleibt nur der Namensbalken,
+  // beim Überfahren rutscht die darunterliegende Karte nach unten weg.
   const kachel = (card) => `
     <div class="deck-card-tile">
       ${bild(card)}
       ${card.quantity > 1 ? `<span class="deck-tile-count">${card.quantity}×</span>` : ""}
       <span class="deck-card-actions deck-tile-actions">${aktionen(card)}</span>
-      <span class="deck-tile-name">${escapeHtml(card.name)}</span>
     </div>
   `;
 
@@ -1692,7 +1692,7 @@ function renderDeckCards() {
             ${escapeHtml(t(gruppe.label))}
             <span>${gruppe.count}</span>
           </h3>
-          <div class="${eingeklappt ? "deck-group-grid" : "deck-group-list"}">
+          <div class="${eingeklappt ? "deck-group-stack" : "deck-group-list"}">
             ${gruppe.cards.map(eingeklappt ? kachel : zeile).join("")}
           </div>
         </div>
