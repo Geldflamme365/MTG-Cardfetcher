@@ -126,6 +126,11 @@ cannot be guessed by trying many times.
 
 ## Decks
 
+> **Still being built.** The deck section works, but it is the newest part of
+> the project and not finished. The overview and the editor still get changes,
+> and the editor in particular is due a visual pass: the panels are laid out
+> for function right now, not for looks. Expect things to move around.
+
 The Decks tab holds every deck you build. Each deck has a name, a format and
 can have a commander. The commander's artwork is what you see on the deck in
 the overview, so you can tell your decks apart at a glance.

@@ -924,6 +924,18 @@ body.is-splitting {
   color: var(--ok);
 }
 
+.dev-notes {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+.dev-notes li {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .legality-list {
   display: grid;
   gap: 8px;

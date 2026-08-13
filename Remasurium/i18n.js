@@ -126,6 +126,19 @@ const EN = {
     "One card per line, the number first. The commander goes first so the list can be read back unchanged.",
   "Die Liste ist leer.": "The list is empty.",
 
+  // Dev-Notiz auf der Startseite
+  "Das Projekt wird laufend weitergebaut. Was als Nächstes ansteht:":
+    "The project keeps growing. What is coming next:",
+  "Die Deck-Ansicht ist noch in Arbeit, der Deck-Editor wird optisch überarbeitet.":
+    "The deck section is still being built, and the deck editor is due a visual pass.",
+  "Weitere Formate neben Commander: Standard, Modern und Pauper.":
+    "More formats besides Commander: Standard, Modern and Pauper.",
+  "Die Regelprüfung soll auch die Farbidentität des Commanders berücksichtigen.":
+    "The rules check should take the commander's colour identity into account as well.",
+  "Ein Login-Limit gegen Passwort-Raten steht, ein Passwort-Reset per Mail fehlt noch.":
+    "A login limit against password guessing is in place, a password reset by email is still missing.",
+  "Rückmeldung geben": "Give feedback",
+
   // Regelprüfung
   "legal": "legal",
   "nicht legal": "not legal",
