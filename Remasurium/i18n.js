@@ -39,7 +39,7 @@ const EN = {
   "Tip": "Tip",
   "Normale Namen werden tolerant gesucht. Wenn du Scryfall-Syntax nutzt, bleibt die Suche exakt.":
     "Plain names are matched loosely. Use Scryfall syntax and the search stays exact.",
-  "z.B. lightning bolt": "e.g. lightning bolt",
+  "z.B. commodore guff": "e.g. commodore guff",
   "z.B. c:g t:creature": "e.g. c:g t:creature",
   "Kartenname, z.B. sol ring": "Card name, e.g. sol ring",
   "Noch keine Treffer. Starte eine Suche oder nutze ein Beispiel.":
