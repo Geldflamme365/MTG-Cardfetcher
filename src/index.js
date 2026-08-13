@@ -47,12 +47,22 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
 }
 
+// Wer die Rückmeldungen lesen und löschen darf. Die Prüfung läuft
+// ausschliesslich hier im Worker; die Oberfläche blendet den Bereich nur
+// zusätzlich aus.
+const ADMIN_EMAIL = "tackeret2008@gmail.com";
+
+function isAdmin(user) {
+  return Boolean(user) && user.email === ADMIN_EMAIL;
+}
+
 function publicUser(row) {
   return {
     id: row.id,
     email: row.email,
     displayName: row.display_name,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    isAdmin: isAdmin(row)
   };
 }
 
@@ -766,6 +776,84 @@ async function handleMergeDecks(request, env, user) {
   return handleListDecks(env, user);
 }
 
+const MAX_REVIEW_LENGTH = 2000;
+
+function reviewFromRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    rating: row.rating,
+    message: row.message,
+    createdAt: row.created_at
+  };
+}
+
+// Rückmeldungen darf jeder abgeben, auch ohne Konto.
+async function handleCreateReview(request, env, session) {
+  const body = await readJson(request);
+  if (!body) {
+    return fail("Ungültiger Request-Body.");
+  }
+
+  const message = String(body.message || "").trim();
+  if (!message) {
+    return fail("Bitte schreib etwas in die Rückmeldung.");
+  }
+
+  const rating = Math.min(Math.max(Math.round(Number(body.rating) || 0), 1), 5);
+  const user = session?.user || null;
+  const name = String(body.name || "").trim().slice(0, 60) || user?.display_name || "Anonym";
+
+  const review = {
+    id: crypto.randomUUID(),
+    user_id: user?.id || null,
+    email: user?.email || null,
+    name,
+    rating,
+    message: message.slice(0, MAX_REVIEW_LENGTH),
+    created_at: new Date().toISOString()
+  };
+
+  await env.DB.prepare(
+    `INSERT INTO reviews (id, user_id, email, name, rating, message, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      review.id,
+      review.user_id,
+      review.email,
+      review.name,
+      review.rating,
+      review.message,
+      review.created_at
+    )
+    .run();
+
+  return json({ ok: true }, 201);
+}
+
+async function handleListReviews(env, user) {
+  if (!isAdmin(user)) {
+    return fail("Nicht berechtigt.", 403);
+  }
+
+  const { results } = await env.DB.prepare(
+    "SELECT * FROM reviews ORDER BY created_at DESC LIMIT 500"
+  ).all();
+
+  return json({ reviews: (results || []).map(reviewFromRow) });
+}
+
+async function handleDeleteReview(env, user, reviewId) {
+  if (!isAdmin(user)) {
+    return fail("Nicht berechtigt.", 403);
+  }
+
+  await env.DB.prepare("DELETE FROM reviews WHERE id = ?").bind(reviewId).run();
+  return json({ ok: true });
+}
+
 async function handleApi(request, env, url) {
   if (!env.DB) {
     return fail("Die Datenbank ist nicht konfiguriert (Binding 'DB' fehlt).", 503);
@@ -788,6 +876,11 @@ async function handleApi(request, env, url) {
   }
 
   const session = await resolveSession(request, env);
+
+  // Ohne Konto möglich, deshalb vor der Anmeldeprüfung.
+  if (path === "/reviews" && method === "POST") {
+    return handleCreateReview(request, env, session);
+  }
 
   if (path === "/auth/me" && method === "GET") {
     return session ? json({ user: publicUser(session.user) }) : json({ user: null });
@@ -820,6 +913,15 @@ async function handleApi(request, env, url) {
     if (method === "DELETE") {
       return handleDeleteCard(env, user, cardId);
     }
+  }
+
+  if (path === "/reviews" && method === "GET") {
+    return handleListReviews(env, user);
+  }
+
+  const reviewMatch = path.match(/^\/reviews\/([^/]+)$/);
+  if (reviewMatch && method === "DELETE") {
+    return handleDeleteReview(env, user, decodeURIComponent(reviewMatch[1]));
   }
 
   if (path === "/decks" && method === "GET") {
