@@ -383,8 +383,10 @@ a:visited {
   cursor: pointer;
 }
 
+/* Fest zwei Spalten: Die vier Punkte stehen dadurch als 2x2 und nicht
+   je nach Breite in einer Reihe. */
 .feature-grid {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .mini-panel {
