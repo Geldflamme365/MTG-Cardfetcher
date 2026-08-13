@@ -1093,11 +1093,14 @@ async function loadRandomCard() {
   setStatus("Ziehe Zufallskarte...", "muted");
 
   try {
-    const card = await fetchRandomCard();
+    // Standardländer überspringen: Als Zufallsfund sind sie wertlos, und
+    // es gibt sehr viele davon. -t:basic erfasst auch die verschneiten
+    // Varianten, denn die tragen dieselbe Typangabe.
+    const card = await fetchRandomCard("-t:basic");
     state.results = [card];
     renderResults();
     await selectSearchCard(card);
-    setStatus(`Zufallskarte geladen: ${card.name}`, "ok");
+    setStatus(t("Zufallskarte geladen: {name}", { name: card.name }), "ok");
   } catch (error) {
     setStatus(`Zufallskarte konnte nicht geladen werden: ${error.message}`, "err");
   }
