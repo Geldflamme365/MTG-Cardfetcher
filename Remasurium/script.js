@@ -20,6 +20,7 @@ const state = {
   deckVersionCard: null,
   renamingDeckId: null,
   deckProblems: [],
+  deckSearchCollapsed: false,
   deckSelection: null,
   deckPrints: [],
   deckFaceIndex: 0,
@@ -102,6 +103,7 @@ const els = {
   feedbackStatus: document.getElementById("feedbackStatus"),
   adminReviews: document.getElementById("adminReviews"),
   reviewList: document.getElementById("reviewList"),
+  toggleSearchBtn: document.getElementById("toggleSearchBtn"),
   legalityBadge: document.getElementById("legalityBadge"),
   legalityModal: document.getElementById("legalityModal"),
   legalityModalCloseBtn: document.getElementById("legalityModalCloseBtn"),
@@ -1584,6 +1586,46 @@ async function applyCommanderVersion(print) {
   });
 }
 
+// Reihenfolge wie in gängigen Deckbau-Seiten. Eine Karte mit mehreren
+// Typen landet beim ersten Treffer dieser Liste: "Artifact Creature"
+// zählt also als Kreatur.
+const CARD_TYPES = [
+  { key: "Creature", label: "Kreaturen" },
+  { key: "Planeswalker", label: "Planeswalker" },
+  { key: "Instant", label: "Spontanzauber" },
+  { key: "Sorcery", label: "Hexereien" },
+  { key: "Artifact", label: "Artefakte" },
+  { key: "Enchantment", label: "Verzauberungen" },
+  { key: "Battle", label: "Schlachten" },
+  { key: "Land", label: "Länder" }
+];
+
+function cardCategory(card) {
+  const typeLine = cardInfoCache.get(card.id)?.typeLine || "";
+  const treffer = CARD_TYPES.find((eintrag) => new RegExp(`\\b${eintrag.key}\\b`, "i").test(typeLine));
+  return treffer ? treffer.label : "Sonstige";
+}
+
+function groupCardsByType(cards) {
+  const gruppen = new Map();
+  for (const card of cards) {
+    const label = cardCategory(card);
+    if (!gruppen.has(label)) {
+      gruppen.set(label, []);
+    }
+    gruppen.get(label).push(card);
+  }
+
+  const reihenfolge = [...CARD_TYPES.map((eintrag) => eintrag.label), "Sonstige"];
+  return reihenfolge
+    .filter((label) => gruppen.has(label))
+    .map((label) => ({
+      label,
+      cards: gruppen.get(label),
+      count: gruppen.get(label).reduce((summe, card) => summe + card.quantity, 0)
+    }));
+}
+
 function renderDeckCards() {
   const cards = state.activeDeckCards;
   const singleton = (state.activeDeck?.format || "commander") === "commander";
@@ -1597,32 +1639,62 @@ function renderDeckCards() {
     return;
   }
 
-  els.deckCards.innerHTML = cards
+  const aktionen = (card) => `
+    <button type="button" data-less="${escapeHtml(card.id)}" title="Eine weniger" aria-label="Eine weniger">-</button>
+    <span class="quantity">${card.quantity}</span>
+    <button type="button" data-more="${escapeHtml(card.id)}" title="${
+      singleton && !card.unlimited ? "Im Commander ist nur ein Exemplar erlaubt" : "Eine mehr"
+    }" aria-label="Eine mehr"${singleton && !card.unlimited ? " disabled" : ""}>+</button>
+    <button type="button" data-commander="${escapeHtml(card.id)}" title="Als Commander festlegen" aria-label="Als Commander festlegen">★</button>
+    <button type="button" data-remove="${escapeHtml(card.id)}" title="Aus dem Deck entfernen" aria-label="Entfernen">X</button>
+  `;
+
+  const bild = (card) => `
+    <button type="button" class="deck-card-thumb" data-version="${escapeHtml(card.id)}" title="Version von ${escapeHtml(card.name)} wechseln" aria-label="Version von ${escapeHtml(card.name)} wechseln">
+      ${
+        card.image
+          ? `<img src="${escapeHtml(card.image)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+          : `<span class="deck-card-thumb-empty">?</span>`
+      }
+    </button>
+  `;
+
+  const zeile = (card) => `
+    <div class="deck-card-row">
+      ${bild(card)}
+      <span class="deck-card-name">
+        <strong>${escapeHtml(card.name)}</strong>
+        <span>${escapeHtml(card.set_name || "?")}</span>
+      </span>
+      <span class="deck-card-actions">${aktionen(card)}</span>
+    </div>
+  `;
+
+  // Eingeklappt steht mehr Platz zur Verfügung, dann werden die Karten
+  // als Bilder gezeigt und die Knöpfe liegen halbdurchsichtig darauf.
+  const kachel = (card) => `
+    <div class="deck-card-tile">
+      ${bild(card)}
+      ${card.quantity > 1 ? `<span class="deck-tile-count">${card.quantity}×</span>` : ""}
+      <span class="deck-card-actions deck-tile-actions">${aktionen(card)}</span>
+      <span class="deck-tile-name">${escapeHtml(card.name)}</span>
+    </div>
+  `;
+
+  const eingeklappt = state.deckSearchCollapsed;
+  els.deckCards.classList.toggle("is-grid", eingeklappt);
+
+  els.deckCards.innerHTML = groupCardsByType(cards)
     .map(
-      (card) => `
-        <div class="deck-card-row">
-          <button type="button" class="deck-card-thumb" data-version="${escapeHtml(card.id)}" title="Version von ${escapeHtml(card.name)} wechseln" aria-label="Version von ${escapeHtml(card.name)} wechseln">
-            ${
-              card.image
-                ? `<img src="${escapeHtml(card.image)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
-                : `<span class="deck-card-thumb-empty">?</span>`
-            }
-          </button>
-          <span class="deck-card-name">
-            <strong>${escapeHtml(card.name)}</strong>
-            <span>${escapeHtml(card.set_name || "?")}</span>
-          </span>
-          <span class="deck-card-actions">
-            <button type="button" data-less="${escapeHtml(card.id)}" title="Eine weniger" aria-label="Eine weniger">-</button>
-            <span class="quantity">${card.quantity}</span>
-            <button type="button" data-more="${escapeHtml(card.id)}" title="${
-              singleton && !card.unlimited
-                ? "Im Commander ist nur ein Exemplar erlaubt"
-                : "Eine mehr"
-            }" aria-label="Eine mehr"${singleton && !card.unlimited ? " disabled" : ""}>+</button>
-            <button type="button" data-commander="${escapeHtml(card.id)}" title="Als Commander festlegen" aria-label="Als Commander festlegen">★</button>
-            <button type="button" data-remove="${escapeHtml(card.id)}" title="Aus dem Deck entfernen" aria-label="Entfernen">X</button>
-          </span>
+      (gruppe) => `
+        <div class="deck-group">
+          <h3 class="deck-group-head">
+            ${escapeHtml(t(gruppe.label))}
+            <span>${gruppe.count}</span>
+          </h3>
+          <div class="${eingeklappt ? "deck-group-grid" : "deck-group-list"}">
+            ${gruppe.cards.map(eingeklappt ? kachel : zeile).join("")}
+          </div>
         </div>
       `
     )
@@ -1794,10 +1866,17 @@ async function updateDeckQueries() {
 // verboten ist, weiss nur Scryfall, deshalb wird die Legalität einmal je
 // Karte geholt und gemerkt.
 const COMMANDER_DECK_SIZE = 100;
-const legalityCache = new Map();
+// Hält je Karte die Commander-Legalität und die Typzeile. Beides kommt
+// aus derselben Abfrage, die Gruppierung nach Kartentyp kostet also
+// keine zusätzliche Anfrage.
+const cardInfoCache = new Map();
+const legalityCache = {
+  get: (id) => cardInfoCache.get(id)?.legality,
+  has: (id) => cardInfoCache.has(id)
+};
 
 async function ensureLegality(ids) {
-  const fehlende = [...new Set(ids)].filter((id) => id && !legalityCache.has(id));
+  const fehlende = [...new Set(ids)].filter((id) => id && !cardInfoCache.has(id));
   if (!fehlende.length) {
     return;
   }
@@ -1816,12 +1895,15 @@ async function ensureLegality(ids) {
 
     const data = await response.json();
     for (const card of data.data || []) {
-      legalityCache.set(card.id, card.legalities?.commander || "unknown");
+      cardInfoCache.set(card.id, {
+        legality: card.legalities?.commander || "unknown",
+        typeLine: card.type_line || ""
+      });
     }
     // Was Scryfall nicht kennt, wird nicht als Fehler gewertet.
     for (const id of teil) {
-      if (!legalityCache.has(id)) {
-        legalityCache.set(id, "unknown");
+      if (!cardInfoCache.has(id)) {
+        cardInfoCache.set(id, { legality: "unknown", typeLine: "" });
       }
     }
   }
@@ -1901,6 +1983,10 @@ async function checkDeckLegality() {
   try {
     await ensureLegality(ids.filter(Boolean));
     renderLegality(collectDeckProblems());
+    // Mit der Legalität kommt auch die Typzeile. Erst jetzt lässt sich
+    // eine frisch hinzugefügte Karte richtig einsortieren, vorher stünde
+    // sie unter "Sonstige".
+    renderDeckCards();
   } catch {
     // Ohne Scryfall bleiben Grösse und Mengen geprüft, verbotene Karten
     // lassen sich dann nicht beurteilen.
@@ -2772,6 +2858,30 @@ els.feedbackModal.addEventListener("click", (event) => {
     closeModal(els.feedbackModal);
   }
 });
+// Suchfenster ein- und ausklappen. Der Pfeil zeigt die Richtung, in die
+// es geht: <| schiebt nach links weg, |> holt es zurück.
+const SEARCH_COLLAPSE_KEY = "remasurium.deckSearchCollapsed";
+
+function applySearchCollapse() {
+  const zu = state.deckSearchCollapsed;
+  els.deckLayout.classList.toggle("is-collapsed", zu);
+  els.toggleSearchBtn.textContent = zu ? "|>" : "<|";
+  const titel = zu ? t("Suchfenster ausklappen") : t("Suchfenster einklappen");
+  els.toggleSearchBtn.title = titel;
+  els.toggleSearchBtn.setAttribute("aria-label", titel);
+  els.toggleSearchBtn.setAttribute("aria-expanded", String(!zu));
+}
+
+els.toggleSearchBtn.addEventListener("click", () => {
+  state.deckSearchCollapsed = !state.deckSearchCollapsed;
+  localStorage.setItem(SEARCH_COLLAPSE_KEY, state.deckSearchCollapsed ? "1" : "0");
+  applySearchCollapse();
+  renderDeckCards();
+});
+
+state.deckSearchCollapsed = localStorage.getItem(SEARCH_COLLAPSE_KEY) === "1";
+applySearchCollapse();
+
 els.legalityBadge.addEventListener("click", () => openModal(els.legalityModal));
 els.legalityModalCloseBtn.addEventListener("click", () => closeModal(els.legalityModal));
 els.legalityModal.addEventListener("click", (event) => {

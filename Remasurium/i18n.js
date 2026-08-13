@@ -126,6 +126,17 @@ const EN = {
     "One card per line, the number first. The commander goes first so the list can be read back unchanged.",
   "Die Liste ist leer.": "The list is empty.",
 
+  // Kartentypen und Einklappen
+  "Suchfenster einklappen": "Collapse the search panel",
+  "Suchfenster ausklappen": "Open the search panel",
+  "Kreaturen": "Creatures",
+  "Spontanzauber": "Instants",
+  "Hexereien": "Sorceries",
+  "Artefakte": "Artifacts",
+  "Verzauberungen": "Enchantments",
+  "Schlachten": "Battles",
+  "Sonstige": "Other",
+
   // Dev-Notiz auf der Startseite
   "Das Projekt wird laufend weitergebaut. Was als Nächstes ansteht:":
     "The project keeps growing. What is coming next:",
