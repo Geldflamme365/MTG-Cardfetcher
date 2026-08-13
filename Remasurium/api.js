@@ -53,6 +53,11 @@ export const api = {
     }),
   deleteCard: (cardId) => call(`/collection/${encodeURIComponent(cardId)}`, { method: "DELETE" }),
 
+  sendReview: (name, rating, message) =>
+    call("/reviews", { method: "POST", body: { name, rating, message } }),
+  listReviews: () => call("/reviews"),
+  deleteReview: (id) => call(`/reviews/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
   listDecks: () => call("/decks"),
   createDeck: (name, format) => call("/decks", { method: "POST", body: { name, format } }),
   getDeck: (id) => call(`/decks/${encodeURIComponent(id)}`),

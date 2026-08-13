@@ -489,6 +489,48 @@
     </div>
   </div>
 
+  <div id="feedbackModal" class="modal" aria-hidden="true">
+    <div class="modal-dialog window modal-narrow" role="dialog" aria-modal="true" aria-label="Rückmeldung">
+      <div class="title-bar">
+        <span>rückmeldung</span>
+        <button id="feedbackModalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
+      </div>
+      <div class="modal-body">
+        <form id="feedbackForm" class="auth-form">
+          <label class="field-label" for="feedbackName">Name (optional)</label>
+          <input id="feedbackName" name="name" type="text" maxlength="60" placeholder="Anonym" autocomplete="off" />
+
+          <label class="field-label spaced" for="feedbackRating">Bewertung</label>
+          <select id="feedbackRating" name="rating">
+            <option value="5">5 – sehr gut</option>
+            <option value="4">4 – gut</option>
+            <option value="3" selected>3 – geht so</option>
+            <option value="2">2 – schwach</option>
+            <option value="1">1 – schlecht</option>
+          </select>
+
+          <label class="field-label spaced" for="feedbackMessage">Was ist dir aufgefallen?</label>
+          <textarea id="feedbackMessage" name="message" rows="6" maxlength="2000" required placeholder="Was gefällt dir, was fehlt, was ist kaputt?"></textarea>
+
+          <div class="button-row">
+            <button type="submit" class="retro-button">Absenden</button>
+          </div>
+        </form>
+
+        <div class="status-wrap">
+          <span class="field-label">Status</span>
+          <div id="feedbackStatus" class="status muted">Noch nichts abgeschickt.</div>
+        </div>
+
+        <div id="adminReviews" hidden>
+          <h2 class="admin-heading">Alle Rückmeldungen</h2>
+          <p class="small-note">Nur für das Adminkonto sichtbar.</p>
+          <div id="reviewList" class="review-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="legalityModal" class="modal" aria-hidden="true">
     <div class="modal-dialog window modal-narrow" role="dialog" aria-modal="true" aria-label="Regelprüfung">
       <div class="title-bar">

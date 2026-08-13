@@ -95,6 +95,13 @@ const els = {
   deckListText: document.getElementById("deckListText"),
   deckCopyBtn: document.getElementById("deckCopyBtn"),
   deckImportBtn: document.getElementById("deckImportBtn"),
+  openFeedbackBtn: document.getElementById("openFeedbackBtn"),
+  feedbackModal: document.getElementById("feedbackModal"),
+  feedbackModalCloseBtn: document.getElementById("feedbackModalCloseBtn"),
+  feedbackForm: document.getElementById("feedbackForm"),
+  feedbackStatus: document.getElementById("feedbackStatus"),
+  adminReviews: document.getElementById("adminReviews"),
+  reviewList: document.getElementById("reviewList"),
   legalityBadge: document.getElementById("legalityBadge"),
   legalityModal: document.getElementById("legalityModal"),
   legalityModalCloseBtn: document.getElementById("legalityModalCloseBtn"),
@@ -2358,6 +2365,95 @@ async function quickAdd() {
   }
 }
 
+function setFeedbackStatus(text, type = "muted") {
+  els.feedbackStatus.textContent = text;
+  els.feedbackStatus.className = `status ${type}`;
+}
+
+function renderReviews(reviews) {
+  if (!reviews.length) {
+    els.reviewList.innerHTML = `<div class="empty-state">${t("Noch keine Rückmeldungen.")}</div>`;
+    return;
+  }
+
+  els.reviewList.innerHTML = reviews
+    .map(
+      (review) => `
+        <div class="review-entry">
+          <div>
+            <div class="review-head">
+              <strong>${escapeHtml(review.name)}</strong>
+              <span>${"★".repeat(review.rating)}${"☆".repeat(5 - review.rating)}</span>
+              <span>${escapeHtml(new Date(review.createdAt).toLocaleString("de-CH"))}</span>
+              ${review.email ? `<span>${escapeHtml(review.email)}</span>` : ""}
+            </div>
+            <p class="review-text">${escapeHtml(review.message)}</p>
+          </div>
+          <button type="button" class="retro-button" data-delete-review="${escapeHtml(review.id)}" title="${t("Rückmeldung löschen")}">X</button>
+        </div>
+      `
+    )
+    .join("");
+
+  for (const btn of els.reviewList.querySelectorAll("button[data-delete-review]")) {
+    btn.addEventListener("click", async () => {
+      try {
+        await api.deleteReview(btn.dataset.deleteReview);
+        await loadReviews();
+        setFeedbackStatus(t("Rückmeldung gelöscht."), "ok");
+      } catch (error) {
+        setFeedbackStatus(error.message, "err");
+      }
+    });
+  }
+}
+
+// Der Bereich erscheint nur für das Adminkonto. Die eigentliche Sperre
+// sitzt im Worker, hier geht es allein um die Ansicht.
+async function loadReviews() {
+  if (!state.user?.isAdmin) {
+    els.adminReviews.hidden = true;
+    return;
+  }
+
+  els.adminReviews.hidden = false;
+  try {
+    const data = await api.listReviews();
+    renderReviews(data.reviews || []);
+  } catch (error) {
+    els.reviewList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function openFeedbackModal() {
+  openModal(els.feedbackModal);
+  loadReviews();
+}
+
+async function submitFeedback(event) {
+  event.preventDefault();
+
+  const message = els.feedbackForm.message.value.trim();
+  if (!message) {
+    setFeedbackStatus(t("Bitte schreib etwas in die Rückmeldung."), "err");
+    return;
+  }
+
+  setFeedbackStatus(t("Wird gesendet..."), "muted");
+  try {
+    await api.sendReview(
+      els.feedbackForm.name.value.trim(),
+      Number(els.feedbackForm.rating.value),
+      message
+    );
+    els.feedbackForm.reset();
+    setFeedbackStatus(t("Danke für die Rückmeldung."), "ok");
+    await loadReviews();
+  } catch (error) {
+    setFeedbackStatus(error.message, "err");
+  }
+}
+
 function setAuthStatus(text, type = "muted") {
   if (!els.authStatus) {
     return;
@@ -2656,6 +2752,14 @@ els.quickAddInput.addEventListener("keydown", (event) => {
 });
 els.deckCopyBtn.addEventListener("click", copyDeckList);
 els.deckImportBtn.addEventListener("click", importDeckAsNew);
+els.openFeedbackBtn.addEventListener("click", openFeedbackModal);
+els.feedbackForm.addEventListener("submit", submitFeedback);
+els.feedbackModalCloseBtn.addEventListener("click", () => closeModal(els.feedbackModal));
+els.feedbackModal.addEventListener("click", (event) => {
+  if (event.target === els.feedbackModal) {
+    closeModal(els.feedbackModal);
+  }
+});
 els.legalityBadge.addEventListener("click", () => openModal(els.legalityModal));
 els.legalityModalCloseBtn.addEventListener("click", () => closeModal(els.legalityModal));
 els.legalityModal.addEventListener("click", (event) => {

@@ -924,6 +924,51 @@ body.is-splitting {
   color: var(--ok);
 }
 
+.admin-heading {
+  margin: 18px 0 4px;
+  padding-top: 14px;
+  border-top: 2px solid #8d887e;
+  font-size: 1rem;
+}
+
+.review-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.review-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid;
+  border-color: var(--edge-light) #8d887e #8d887e var(--edge-light);
+  background: #f4f0e7;
+}
+
+.review-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.review-head strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.review-text {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .dev-notes {
   display: grid;
   gap: 8px;

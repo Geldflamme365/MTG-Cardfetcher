@@ -139,6 +139,29 @@ const EN = {
     "A login limit against password guessing is in place, a password reset by email is still missing.",
   "Rückmeldung geben": "Give feedback",
 
+  // Rückmeldungen
+  "rückmeldung": "feedback",
+  "Bewertung": "Rating",
+  "5 – sehr gut": "5 – very good",
+  "4 – gut": "4 – good",
+  "3 – geht so": "3 – so-so",
+  "2 – schwach": "2 – weak",
+  "1 – schlecht": "1 – bad",
+  "Was ist dir aufgefallen?": "What did you notice?",
+  "Was gefällt dir, was fehlt, was ist kaputt?":
+    "What do you like, what is missing, what is broken?",
+  "Anonym": "Anonymous",
+  "Absenden": "Send",
+  "Noch nichts abgeschickt.": "Nothing sent yet.",
+  "Wird gesendet...": "Sending...",
+  "Danke für die Rückmeldung.": "Thanks for the feedback.",
+  "Bitte schreib etwas in die Rückmeldung.": "Please write something in the feedback.",
+  "Alle Rückmeldungen": "All feedback",
+  "Nur für das Adminkonto sichtbar.": "Only visible to the admin account.",
+  "Noch keine Rückmeldungen.": "No feedback yet.",
+  "Rückmeldung löschen": "Delete feedback",
+  "Rückmeldung gelöscht.": "Feedback deleted.",
+
   // Regelprüfung
   "legal": "legal",
   "nicht legal": "not legal",
