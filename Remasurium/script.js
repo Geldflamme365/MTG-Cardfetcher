@@ -253,7 +253,10 @@ function renderRoute() {
 
   document.title = titleMap[route] || "MTG Remasurium";
 
+  // Der Tab führt immer auf die Übersicht. Ohne das bliebe das zuletzt
+  // geöffnete Deck stehen, obwohl man den Menüpunkt angeklickt hat.
   if (route === "decks") {
+    showDeckOverview();
     refreshDecks();
   }
 
