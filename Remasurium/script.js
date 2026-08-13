@@ -1600,9 +1600,18 @@ const CARD_TYPES = [
   { key: "Land", label: "Länder" }
 ];
 
+function hatTyp(typeLine, key) {
+  return new RegExp(`\\b${key}\\b`, "i").test(typeLine);
+}
+
 function cardCategory(card) {
   const typeLine = cardInfoCache.get(card.id)?.typeLine || "";
-  const treffer = CARD_TYPES.find((eintrag) => new RegExp(`\\b${eintrag.key}\\b`, "i").test(typeLine));
+  // Ein Land bleibt ein Land, auch wenn die Typzeile noch etwas anderes
+  // nennt: Artefaktländer, Dryad Arbor, Kreaturenländer.
+  if (hatTyp(typeLine, "Land")) {
+    return CARD_TYPES.find((eintrag) => eintrag.key === "Land").label;
+  }
+  const treffer = CARD_TYPES.find((eintrag) => hatTyp(typeLine, eintrag.key));
   return treffer ? treffer.label : "Sonstige";
 }
 
