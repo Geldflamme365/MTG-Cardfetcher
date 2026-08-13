@@ -144,8 +144,6 @@ const EN = {
     "The deck section is still being built, and the deck editor is due a visual pass.",
   "Weitere Formate neben Commander: Standard, Modern und Pauper.":
     "More formats besides Commander: Standard, Modern and Pauper.",
-  "Die Regelprüfung soll auch die Farbidentität des Commanders berücksichtigen.":
-    "The rules check should take the commander's colour identity into account as well.",
   "Ein Login-Limit gegen Passwort-Raten steht, ein Passwort-Reset per Mail fehlt noch.":
     "A login limit against password guessing is in place, a password reset by email is still missing.",
   "Rückmeldung": "Feedback",
@@ -193,8 +191,10 @@ const EN = {
     "{name}: {count} copies, only one is allowed.",
   "{name} ist im Commander verboten.": "{name} is banned in Commander.",
   "{name} ist im Commander nicht zugelassen.": "{name} is not allowed in Commander.",
-  "Geprüft werden die Deckgrösse von genau 100 Karten inklusive Commander, ein Exemplar je Karte ausser bei Standardländern und Relentless-Karten, sowie im Commander verbotene Karten.":
-    "Checked are the deck size of exactly 100 cards including the commander, one copy of each card apart from basic lands and Relentless cards, and cards banned in Commander.",
+  "{name} passt nicht zur Farbidentität {colors} des Commanders.":
+    "{name} does not fit the commander's colour identity {colors}.",
+  "Geprüft werden die Deckgrösse von genau 100 Karten inklusive Commander, ein Exemplar je Karte ausser bei Standardländern und Relentless-Karten, im Commander verbotene Karten sowie die Farbidentität des Commanders. Karten, an denen etwas hängt, sind im Deck rot umrandet.":
+    "Checked are the deck size of exactly 100 cards including the commander, one copy of each card apart from basic lands and Relentless cards, cards banned in Commander, and the commander's colour identity. Cards that cause a problem get a red border in the deck.",
   "Kreaturen": "Creatures",
   "Spells": "Spells",
   "Kartenziehen": "Card draw",

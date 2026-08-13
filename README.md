@@ -219,13 +219,12 @@ Next to "Delete deck" the editor shows whether the deck is legal. Red-orange
 - exactly 100 cards, the commander counted among them
 - one copy of each card, apart from basic lands and cards like Relentless Rats
 - cards banned or not allowed in Commander
+- every card inside the commander's colour identity
 
-The ban list is not kept in this project. Card legality comes from Scryfall and
-is remembered per card, so the check costs at most one request per new card. If
-Scryfall cannot be reached, size and copies are still checked and only the ban
-list is skipped.
+Cards that cause a problem get a red border in the deck, in both the list and
+the stacked view, so a message in the window can be traced back to a card.
 
-## Not done yet
-
-- The rules check knows nothing about the commander's colour identity yet, so
-  a card outside its colours is not flagged.
+The ban list is not kept in this project. Card legality, type line and colour
+identity all come from Scryfall in one request per new card, so the check costs
+nothing extra. If Scryfall cannot be reached, size and copies are still checked
+and the rest is skipped.

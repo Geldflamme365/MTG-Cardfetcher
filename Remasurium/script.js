@@ -20,6 +20,8 @@ const state = {
   deckVersionCard: null,
   renamingDeckId: null,
   deckProblems: [],
+  // Die Karten-Ids aus den Problemen, damit sie im Deck rot umrandet werden.
+  deckProblemCards: new Set(),
   deckSearchCollapsed: false,
   deckSelection: null,
   deckPrints: [],
@@ -1452,10 +1454,12 @@ function showDeckOverview() {
 function renderCommanderSlot() {
   const commander = state.activeDeck?.commander;
 
+  const rot = commander && state.deckProblemCards.has(commander.id) ? " is-illegal" : "";
+
   els.commanderSlot.innerHTML = `
     ${
       commander?.image
-        ? `<button type="button" class="deck-card-thumb" id="commanderVersionBtn" title="Version von ${escapeHtml(
+        ? `<button type="button" class="deck-card-thumb${rot}" id="commanderVersionBtn" title="Version von ${escapeHtml(
             commander.name || "Commander"
           )} wechseln" aria-label="Version des Commanders wechseln"><img src="${escapeHtml(
             commander.image
@@ -1668,8 +1672,11 @@ function renderDeckCards() {
     </button>
   `;
 
+  // Karten, an denen die Regelprüfung hängt, bekommen einen roten Rand.
+  const rot = (card) => (state.deckProblemCards.has(card.id) ? " is-illegal" : "");
+
   const zeile = (card) => `
-    <div class="deck-card-row">
+    <div class="deck-card-row${rot(card)}">
       ${bild(card)}
       <span class="deck-card-name">
         <strong>${escapeHtml(card.name)}</strong>
@@ -1683,7 +1690,7 @@ function renderDeckCards() {
   // Kategorie als Stapel untereinander: sichtbar bleibt nur der Namensbalken,
   // beim Überfahren rutscht die darunterliegende Karte nach unten weg.
   const kachel = (card) => `
-    <div class="deck-card-tile">
+    <div class="deck-card-tile${rot(card)}">
       ${bild(card)}
       ${card.quantity > 1 ? `<span class="deck-tile-count">${card.quantity}×</span>` : ""}
       <span class="deck-card-actions deck-tile-actions">${aktionen(card)}</span>
@@ -1875,9 +1882,9 @@ async function updateDeckQueries() {
 // verboten ist, weiss nur Scryfall, deshalb wird die Legalität einmal je
 // Karte geholt und gemerkt.
 const COMMANDER_DECK_SIZE = 100;
-// Hält je Karte die Commander-Legalität und die Typzeile. Beides kommt
-// aus derselben Abfrage, die Gruppierung nach Kartentyp kostet also
-// keine zusätzliche Anfrage.
+// Hält je Karte die Commander-Legalität, die Typzeile und die
+// Farbidentität. Alles kommt aus derselben Abfrage, Gruppierung und
+// Farbprüfung kosten also keine zusätzliche Anfrage.
 const cardInfoCache = new Map();
 const legalityCache = {
   get: (id) => cardInfoCache.get(id)?.legality,
@@ -1906,16 +1913,24 @@ async function ensureLegality(ids) {
     for (const card of data.data || []) {
       cardInfoCache.set(card.id, {
         legality: card.legalities?.commander || "unknown",
-        typeLine: card.type_line || ""
+        typeLine: card.type_line || "",
+        colorIdentity: card.color_identity || []
       });
     }
     // Was Scryfall nicht kennt, wird nicht als Fehler gewertet.
     for (const id of teil) {
       if (!cardInfoCache.has(id)) {
-        cardInfoCache.set(id, { legality: "unknown", typeLine: "" });
+        cardInfoCache.set(id, { legality: "unknown", typeLine: "", colorIdentity: null });
       }
     }
   }
+}
+
+// Die Farbidentität wird als WUBRG-Kürzel angezeigt, farblos als C.
+function farbkuerzel(identitaet) {
+  const reihenfolge = ["W", "U", "B", "R", "G"];
+  const sortiert = reihenfolge.filter((farbe) => identitaet.includes(farbe));
+  return sortiert.length ? sortiert.join("") : "C";
 }
 
 function collectDeckProblems() {
@@ -1923,20 +1938,23 @@ function collectDeckProblems() {
   const karten = state.activeDeckCards;
   const commander = state.activeDeck?.commander;
   const gesamt = karten.reduce((summe, karte) => summe + karte.quantity, 0) + (commander ? 1 : 0);
+  // Ein Problem kennt die Karten, die es ausgelöst haben. Damit lassen
+  // sie sich im Deck rot umranden.
+  const melde = (text, ...ids) => probleme.push({ text, ids });
 
   if (!commander) {
-    probleme.push(t("Dem Deck fehlt ein Commander."));
+    melde(t("Dem Deck fehlt ein Commander."));
   }
 
   if (gesamt < COMMANDER_DECK_SIZE) {
-    probleme.push(
+    melde(
       t("Das Deck hat {count} Karten, es fehlen {diff} auf 100.", {
         count: gesamt,
         diff: COMMANDER_DECK_SIZE - gesamt
       })
     );
   } else if (gesamt > COMMANDER_DECK_SIZE) {
-    probleme.push(
+    melde(
       t("Das Deck hat {count} Karten, {diff} zu viel für 100.", {
         count: gesamt,
         diff: gesamt - COMMANDER_DECK_SIZE
@@ -1946,8 +1964,9 @@ function collectDeckProblems() {
 
   for (const karte of karten) {
     if (karte.quantity > 1 && !karte.unlimited) {
-      probleme.push(
-        t("{name}: {count} Exemplare, erlaubt ist eines.", { name: karte.name, count: karte.quantity })
+      melde(
+        t("{name}: {count} Exemplare, erlaubt ist eines.", { name: karte.name, count: karte.quantity }),
+        karte.id
       );
     }
   }
@@ -1955,9 +1974,29 @@ function collectDeckProblems() {
   for (const karte of [commander, ...karten].filter(Boolean)) {
     const status = legalityCache.get(karte.id);
     if (status === "banned") {
-      probleme.push(t("{name} ist im Commander verboten.", { name: karte.name }));
+      melde(t("{name} ist im Commander verboten.", { name: karte.name }), karte.id);
     } else if (status === "not_legal") {
-      probleme.push(t("{name} ist im Commander nicht zugelassen.", { name: karte.name }));
+      melde(t("{name} ist im Commander nicht zugelassen.", { name: karte.name }), karte.id);
+    }
+  }
+
+  // Der Commander steckt den Farbrahmen ab: Jede Karte im Deck darf nur
+  // Farben mitbringen, die auch er hat. Ohne Daten von Scryfall wird
+  // nicht geraten.
+  const rahmen = commander && cardInfoCache.get(commander.id)?.colorIdentity;
+  if (rahmen) {
+    for (const karte of karten) {
+      const eigene = cardInfoCache.get(karte.id)?.colorIdentity;
+      if (!eigene || eigene.every((farbe) => rahmen.includes(farbe))) {
+        continue;
+      }
+      melde(
+        t("{name} passt nicht zur Farbidentität {colors} des Commanders.", {
+          name: karte.name,
+          colors: farbkuerzel(rahmen)
+        }),
+        karte.id
+      );
     }
   }
 
@@ -1966,6 +2005,7 @@ function collectDeckProblems() {
 
 function renderLegality(probleme) {
   state.deckProblems = probleme;
+  state.deckProblemCards = new Set(probleme.flatMap((problem) => problem.ids));
 
   const inOrdnung = probleme.length === 0;
   els.legalityBadge.textContent = inOrdnung ? t("legal") : t("nicht legal");
@@ -1977,7 +2017,9 @@ function renderLegality(probleme) {
     : t("{count} Punkte sprechen gegen ein legales Commander-Deck.", { count: probleme.length });
   els.legalitySummary.className = `status ${inOrdnung ? "ok" : "err"}`;
 
-  els.legalityList.innerHTML = probleme.map((text) => `<li>${escapeHtml(text)}</li>`).join("");
+  els.legalityList.innerHTML = probleme
+    .map((problem) => `<li>${escapeHtml(problem.text)}</li>`)
+    .join("");
 }
 
 async function checkDeckLegality() {
@@ -1992,10 +2034,11 @@ async function checkDeckLegality() {
   try {
     await ensureLegality(ids.filter(Boolean));
     renderLegality(collectDeckProblems());
-    // Mit der Legalität kommt auch die Typzeile. Erst jetzt lässt sich
-    // eine frisch hinzugefügte Karte richtig einsortieren, vorher stünde
-    // sie unter "Sonstige".
+    // Mit der Legalität kommen auch Typzeile und Farbidentität. Erst jetzt
+    // lässt sich eine frisch hinzugefügte Karte richtig einsortieren
+    // (vorher stünde sie unter "Sonstige") und rot umranden.
     renderDeckCards();
+    renderCommanderSlot();
   } catch {
     // Ohne Scryfall bleiben Grösse und Mengen geprüft, verbotene Karten
     // lassen sich dann nicht beurteilen.
@@ -2007,10 +2050,12 @@ function renderDeckEditor() {
     return;
   }
   els.deckNameInput.value = state.activeDeck.name;
+  // Zuerst prüfen: der synchrone Teil setzt die Problemkarten, damit die
+  // roten Ränder gleich beim ersten Zeichnen stimmen.
+  checkDeckLegality();
   renderCommanderSlot();
   renderDeckCards();
   updateDeckQueries();
-  checkDeckLegality();
 }
 
 function applyDeckResult(result) {

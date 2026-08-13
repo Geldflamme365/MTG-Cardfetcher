@@ -16,6 +16,10 @@
   --violet-edge: #9b8ad1;
   --ok: #1f6f2f;
   --danger: #7f1f2a;
+  /* Rotorange der Regelprüfung: Anzeige und Kartenrand tragen dieselbe
+     Farbe, damit die Meldung und die Karte zusammengehören. */
+  --illegal: #c2470f;
+  --illegal-dark: #8d3209;
 }
 
 * {
@@ -482,6 +486,18 @@ input::placeholder {
 
 .results {
   min-height: 360px;
+}
+
+/* Die Mindesthöhe der Ergebnisfläche darf die Karten nicht in die Länge
+   ziehen. Ohne das strecken sich die Zeilen bis nach unten und unter dem
+   Kartenbild klafft der dunkle Rahmen auf. */
+.results,
+.collection-list,
+.search-grid,
+.collection-grid,
+.search-tile,
+.collection-tile {
+  align-content: start;
 }
 
 .search-grid,
@@ -1098,7 +1114,7 @@ body.is-splitting {
 }
 
 .legality-badge.is-illegal {
-  color: #c2470f;
+  color: var(--illegal);
 }
 
 .legality-badge.is-legal {
@@ -1276,6 +1292,21 @@ body.is-splitting {
   border: 2px solid;
   border-color: var(--edge-light) #8d887e #8d887e var(--edge-light);
   background: linear-gradient(180deg, #ece8de, #d7d2c8);
+}
+
+/* Karten, an denen die Regelprüfung hängt: roter Rand in beiden
+   Ansichten und beim Commander, damit die Meldung im Deck auffindbar
+   ist. */
+.deck-card-row.is-illegal {
+  border-color: var(--illegal) var(--illegal-dark) var(--illegal-dark) var(--illegal);
+  background: linear-gradient(180deg, #f7e3de, #e8cbc4);
+}
+
+.deck-card-row.is-illegal .deck-card-thumb,
+.deck-card-tile.is-illegal .deck-card-thumb,
+.deck-card-thumb.is-illegal {
+  border-color: var(--illegal);
+  box-shadow: 0 0 0 1px var(--illegal-dark);
 }
 
 /* Das Kartenbild ist der Knopf für den Versionswechsel. */
