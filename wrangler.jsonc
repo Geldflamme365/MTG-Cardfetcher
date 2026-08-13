@@ -7,6 +7,15 @@
     "directory": "./Remasurium",
     "binding": "ASSETS"
   },
+  // Sobald Routes gesetzt sind, schaltet Wrangler die workers.dev-Adresse
+  // ohne diese Zeile ab. Sie bleibt als Ausweichadresse bestehen.
+  "workers_dev": true,
+  // Custom Domains statt Routes: Cloudflare legt DNS-Eintrag und
+  // Zertifikat selbst an und deckt jeden Pfad ab.
+  "routes": [
+    { "pattern": "remasurium.ch", "custom_domain": true },
+    { "pattern": "www.remasurium.ch", "custom_domain": true }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
