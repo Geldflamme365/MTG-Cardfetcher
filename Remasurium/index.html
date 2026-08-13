@@ -243,7 +243,8 @@
         <div class="deck-layout">
           <article class="window panel console-panel">
             <div class="panel-title-bar panel-title-bar-wide">
-              <span>card search</span>
+              <span class="collapse-title">card search</span>
+              <button id="toggleSearchBtn" type="button" class="collapse-toggle" title="Suchfenster einklappen" aria-label="Suchfenster einklappen">&lt;|</button>
               <strong id="deckSearchCount">0 cards</strong>
             </div>
             <div class="panel-body">
@@ -269,7 +270,6 @@
             </div>
             <div class="panel-body">
               <div class="button-row deck-toolbar">
-                <button id="toggleSearchBtn" type="button" class="retro-button collapse-toggle" title="Suchfenster einklappen" aria-label="Suchfenster einklappen">&lt;|</button>
                 <button id="backToDecksBtn" type="button" class="retro-button">Zurück zur Übersicht</button>
                 <button id="openExportBtn" type="button" class="retro-button">Deck exportieren</button>
                 <button id="deleteDeckBtn" type="button" class="retro-button">Deck löschen</button>

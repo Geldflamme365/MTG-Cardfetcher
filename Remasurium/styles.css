@@ -766,21 +766,65 @@ input::placeholder {
   align-items: start;
 }
 
-/* Eingeklappt verschwinden Suchfenster und Trennlinie, das Deck nimmt
-   die volle Breite ein. */
+/* Eingeklappt bleibt vom Suchfenster nur eine schmale senkrechte Leiste
+   mit dem Ausklapp-Knopf stehen, den Rest bekommt das Deck. */
 .deck-layout.is-collapsed {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 48px minmax(0, 1fr);
 }
 
-.deck-layout.is-collapsed > .console-panel,
 .deck-layout.is-collapsed > .deck-splitter {
   display: none;
 }
 
+.deck-layout.is-collapsed > .console-panel {
+  align-self: stretch;
+  min-height: 120px;
+}
+
+.deck-layout.is-collapsed > .console-panel > .panel-body,
+.deck-layout.is-collapsed .collapse-title,
+.deck-layout.is-collapsed #deckSearchCount {
+  display: none;
+}
+
+.deck-layout.is-collapsed > .console-panel .panel-title-bar {
+  justify-content: center;
+  gap: 0;
+  padding: 6px 4px;
+}
+
+.deck-layout.is-collapsed .collapse-toggle {
+  min-width: 0;
+  margin-left: 0;
+  padding: 1px 4px;
+}
+
+/* Der Knopf sitzt in der Titelleiste direkt links vom Kartenzähler und
+   sieht aus wie ein Fensterknopf. */
 .collapse-toggle {
-  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 22px;
+  margin-left: auto;
+  padding: 1px 7px;
+  color: var(--ink);
+  background: linear-gradient(180deg, #efebe1, #cbc6bc);
+  border: 2px solid;
+  border-color: var(--edge-light) #615d54 #615d54 var(--edge-light);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.95),
+    inset -1px -1px 0 rgba(120, 114, 104, 0.9);
   font-family: "Courier New", Courier, monospace;
+  font-weight: 700;
+  font-size: 0.85rem;
   letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.collapse-toggle:hover {
+  filter: brightness(1.03);
 }
 
 .deck-group + .deck-group {

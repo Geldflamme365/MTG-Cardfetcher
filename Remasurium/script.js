@@ -2916,6 +2916,9 @@ function rerenderDynamicText() {
   renderCollection();
   renderDeckList();
   renderAccount();
+  // Der Titel des Einklapp-Knopfs hängt am Zustand, nicht am Quelltext:
+  // die Übersetzung würde sonst den ursprünglichen Text zurücksetzen.
+  applySearchCollapse();
   if (state.activeDeck) {
     renderDeckEditor();
   }
