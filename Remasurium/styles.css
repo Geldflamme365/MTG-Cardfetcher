@@ -116,6 +116,16 @@ a:visited {
   border-bottom: 2px solid #8b867c;
 }
 
+/* Sieht aus wie die übrigen Menüpunkte, ist aber ein Knopf, weil es
+   kein eigenes Ziel öffnet, sondern ein Fenster. */
+.nav-button {
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
 /* Schiebt die Sprachumschaltung an den rechten Rand. */
 .lang-toggle {
   margin-left: auto;

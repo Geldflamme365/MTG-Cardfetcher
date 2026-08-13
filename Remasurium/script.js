@@ -211,7 +211,12 @@ function normalizeRoute(hash) {
 
 function setActiveNav(route) {
   for (const link of els.navLinks) {
-    const target = normalizeRoute(link.getAttribute("href") || "");
+    // Der Rückmeldeknopf trägt zwar dieselbe Klasse, führt aber zu
+    // keinem Ziel und darf deshalb nie als aktive Seite erscheinen.
+    if (!link.getAttribute("href")) {
+      continue;
+    }
+    const target = normalizeRoute(link.getAttribute("href"));
     const active = route === target;
     link.classList.toggle("active", active);
     link.setAttribute("aria-current", active ? "page" : "false");

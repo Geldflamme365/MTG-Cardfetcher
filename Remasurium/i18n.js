@@ -137,7 +137,9 @@ const EN = {
     "The rules check should take the commander's colour identity into account as well.",
   "Ein Login-Limit gegen Passwort-Raten steht, ein Passwort-Reset per Mail fehlt noch.":
     "A login limit against password guessing is in place, a password reset by email is still missing.",
-  "Rückmeldung geben": "Give feedback",
+  "Rückmeldung": "Feedback",
+  "Was fehlt dir? Sag es über „Rückmeldung“ oben in der Leiste.":
+    "Missing something? Tell us through “Feedback” up in the bar.",
 
   // Rückmeldungen
   "rückmeldung": "feedback",
