@@ -2524,7 +2524,7 @@ function setFeedbackStatus(text, type = "muted") {
 
 function renderReviews(reviews) {
   if (!reviews.length) {
-    els.reviewList.innerHTML = `<div class="empty-state">${t("Noch keine Rückmeldungen.")}</div>`;
+    els.reviewList.innerHTML = `<div class="empty-state">${t("Noch kein Feedback.")}</div>`;
     return;
   }
 
@@ -2541,7 +2541,7 @@ function renderReviews(reviews) {
             </div>
             <p class="review-text">${escapeHtml(review.message)}</p>
           </div>
-          <button type="button" class="retro-button" data-delete-review="${escapeHtml(review.id)}" title="${t("Rückmeldung löschen")}">X</button>
+          <button type="button" class="retro-button" data-delete-review="${escapeHtml(review.id)}" title="${t("Feedback löschen")}">X</button>
         </div>
       `
     )
@@ -2552,7 +2552,7 @@ function renderReviews(reviews) {
       try {
         await api.deleteReview(btn.dataset.deleteReview);
         await loadReviews();
-        setFeedbackStatus(t("Rückmeldung gelöscht."), "ok");
+        setFeedbackStatus(t("Feedback gelöscht."), "ok");
       } catch (error) {
         setFeedbackStatus(error.message, "err");
       }
@@ -2587,7 +2587,7 @@ async function submitFeedback(event) {
 
   const message = els.feedbackForm.message.value.trim();
   if (!message) {
-    setFeedbackStatus(t("Bitte schreib etwas in die Rückmeldung."), "err");
+    setFeedbackStatus(t("Bitte schreib etwas ins Feedback."), "err");
     return;
   }
 
@@ -2599,7 +2599,7 @@ async function submitFeedback(event) {
       message
     );
     els.feedbackForm.reset();
-    setFeedbackStatus(t("Danke für die Rückmeldung."), "ok");
+    setFeedbackStatus(t("Danke für das Feedback."), "ok");
     await loadReviews();
   } catch (error) {
     setFeedbackStatus(error.message, "err");

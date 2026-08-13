@@ -146,12 +146,10 @@ const EN = {
     "More formats besides Commander: Standard, Modern and Pauper.",
   "Ein Login-Limit gegen Passwort-Raten steht, ein Passwort-Reset per Mail fehlt noch.":
     "A login limit against password guessing is in place, a password reset by email is still missing.",
-  "Rückmeldung": "Feedback",
-  "Was fehlt dir? Sag es über „Rückmeldung“ oben in der Leiste.":
+  "Was fehlt dir? Sag es über „Feedback“ oben in der Leiste.":
     "Missing something? Tell us through “Feedback” up in the bar.",
 
-  // Rückmeldungen
-  "rückmeldung": "feedback",
+  // Feedback
   "Bewertung": "Rating",
   "5 – sehr gut": "5 – very good",
   "4 – gut": "4 – good",
@@ -165,13 +163,13 @@ const EN = {
   "Absenden": "Send",
   "Noch nichts abgeschickt.": "Nothing sent yet.",
   "Wird gesendet...": "Sending...",
-  "Danke für die Rückmeldung.": "Thanks for the feedback.",
-  "Bitte schreib etwas in die Rückmeldung.": "Please write something in the feedback.",
-  "Alle Rückmeldungen": "All feedback",
+  "Danke für das Feedback.": "Thanks for the feedback.",
+  "Bitte schreib etwas ins Feedback.": "Please write something in the feedback.",
+  "Alle Feedbacks": "All feedback",
   "Nur für das Adminkonto sichtbar.": "Only visible to the admin account.",
-  "Noch keine Rückmeldungen.": "No feedback yet.",
-  "Rückmeldung löschen": "Delete feedback",
-  "Rückmeldung gelöscht.": "Feedback deleted.",
+  "Noch kein Feedback.": "No feedback yet.",
+  "Feedback löschen": "Delete feedback",
+  "Feedback gelöscht.": "Feedback deleted.",
 
   // Regelprüfung
   "legal": "legal",

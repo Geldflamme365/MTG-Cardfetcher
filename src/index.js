@@ -47,7 +47,7 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
 }
 
-// Wer die Rückmeldungen lesen und löschen darf. Die Prüfung läuft
+// Wer das Feedback lesen und löschen darf. Die Prüfung läuft
 // ausschliesslich hier im Worker; die Oberfläche blendet den Bereich nur
 // zusätzlich aus.
 const ADMIN_EMAIL = "tackeret2008@gmail.com";
@@ -789,7 +789,7 @@ function reviewFromRow(row) {
   };
 }
 
-// Rückmeldungen darf jeder abgeben, auch ohne Konto.
+// Feedback darf jeder abgeben, auch ohne Konto.
 async function handleCreateReview(request, env, session) {
   const body = await readJson(request);
   if (!body) {
@@ -798,7 +798,7 @@ async function handleCreateReview(request, env, session) {
 
   const message = String(body.message || "").trim();
   if (!message) {
-    return fail("Bitte schreib etwas in die Rückmeldung.");
+    return fail("Bitte schreib etwas ins Feedback.");
   }
 
   const rating = Math.min(Math.max(Math.round(Number(body.rating) || 0), 1), 5);
