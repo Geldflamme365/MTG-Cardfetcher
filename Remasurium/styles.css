@@ -1166,6 +1166,16 @@ body.is-splitting {
   overflow-wrap: anywhere;
 }
 
+/* Steht zuoberst im Fenster und soll auffallen, ohne zu schreien. */
+.dev-warning {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #f7e3de;
+  border-left: 4px solid var(--illegal);
+  font-size: 0.92rem;
+}
+
 .dev-notes {
   display: grid;
   gap: 8px;

@@ -138,6 +138,8 @@ const EN = {
   "Sonstige": "Other",
 
   // Dev-Notiz auf der Startseite
+  "Der Server ist noch ein Testserver. Sind mehrere Leute gleichzeitig unterwegs, kann die Geschwindigkeit deshalb schwanken.":
+    "This still runs on a test server. When several people are on it at the same time, the speed can vary.",
   "Das Projekt wird laufend weitergebaut. Was als Nächstes ansteht:":
     "The project keeps growing. What is coming next:",
   "Die Deck-Ansicht ist noch in Arbeit, der Deck-Editor wird optisch überarbeitet.":
