@@ -13,8 +13,7 @@ included, and opens it. The search page has the same thing as a suggestion
 button, but there the card only drops into the result list without opening
 anything.
 
-You can try it right now at
-<https://mtg-remasurium.t-ackeret-inf24.workers.dev>. It is still in
+You can try it right now at <https://remasurium.ch>. It is still in
 development, so things can change.
 
 ## Project structure
