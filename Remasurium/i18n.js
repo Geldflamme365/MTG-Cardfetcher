@@ -144,7 +144,6 @@ const EN = {
     "The project keeps growing. What is coming next:",
   "Eine Scan-Funktion fürs Handy, um Karten mit der Kamera aufzunehmen.":
     "A scan function for phones, to capture cards with the camera.",
-  "Preise über die Cardmarket-API.": "Prices through the Cardmarket API.",
   "Ein Spielzähler: Format wählen, Lebenspunkte mitschreiben, Spielerzahl einstellen.":
     "A game tracker: pick a format, keep life totals, set the number of players.",
   "Bessere Kartenvorschläge je Commander, mit Daten von EDHREC.":
@@ -152,8 +151,6 @@ const EN = {
   "Ein Playtester zum Goldfishing.": "A playtester for goldfishing.",
   "Weitere Formate neben Commander: Standard, Modern und Pauper.":
     "More formats besides Commander: Standard, Modern and Pauper.",
-  "Ein Login-Limit gegen Passwort-Raten steht, ein Passwort-Reset per Mail fehlt noch.":
-    "A login limit against password guessing is in place, a password reset by email is still missing.",
   "Was fehlt dir? Sag es über „Feedback“ oben in der Leiste.":
     "Missing something? Tell us through “Feedback” up in the bar.",
 

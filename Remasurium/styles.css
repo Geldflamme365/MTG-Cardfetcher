@@ -300,7 +300,15 @@ a:visited {
   grid-template-columns: 320px minmax(0, 1fr);
 }
 
+/* Das Fenster wird so hoch wie das daneben. Ohne das bleibt der dunkle
+   Bereich auf Inhaltshöhe stehen und darunter klafft der helle Rahmen. */
+.hero-panel {
+  display: flex;
+  flex-direction: column;
+}
+
 .hero-panel .panel-body {
+  flex: 1;
   color: #f6f0ff;
   background: linear-gradient(180deg, rgba(40, 22, 78, 0.98), rgba(18, 9, 34, 0.98));
 }
