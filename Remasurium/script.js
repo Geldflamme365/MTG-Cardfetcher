@@ -1900,6 +1900,69 @@ const legalityCache = {
   has: (id) => cardInfoCache.has(id)
 };
 
+// Diese Angaben ändern sich so gut wie nie: Typzeile und Farbidentität gar
+// nicht, die Legalität nur wenn die Bannliste angepasst wird. Sie im
+// Browser zu behalten spart nach jedem Neuladen die Abfrage an Scryfall.
+const CARD_INFO_KEY = "remasurium.cardInfo";
+const CARD_INFO_TTL = 30 * 24 * 60 * 60 * 1000;
+const CARD_INFO_MAX = 4000;
+
+function ladeCardInfo() {
+  let roh;
+  try {
+    roh = JSON.parse(localStorage.getItem(CARD_INFO_KEY) || "null");
+  } catch {
+    return;
+  }
+  if (!roh || roh.v !== 1 || typeof roh.cards !== "object") {
+    return;
+  }
+
+  const grenze = Date.now() - CARD_INFO_TTL;
+  for (const [id, eintrag] of Object.entries(roh.cards)) {
+    if (!eintrag || eintrag.t < grenze) continue;
+    cardInfoCache.set(id, {
+      legality: eintrag.legality,
+      typeLine: eintrag.typeLine,
+      colorIdentity: eintrag.colorIdentity,
+      manaCost: eintrag.manaCost,
+      t: eintrag.t
+    });
+  }
+}
+
+let speicherLauf = null;
+
+function speichereCardInfo() {
+  // Gesammelt schreiben, sonst wird die ganze Ablage je Karte neu erzeugt.
+  clearTimeout(speicherLauf);
+  speicherLauf = setTimeout(() => {
+    // Was Scryfall nicht kannte, wird nicht behalten: sonst bliebe eine
+    // einmalige Fehlantwort dreissig Tage lang stehen.
+    const brauchbar = [...cardInfoCache.entries()].filter(
+      ([, eintrag]) => eintrag.colorIdentity !== null
+    );
+    // Bei Überlauf die ältesten Einträge fallen lassen.
+    const behalten = brauchbar
+      .sort((a, b) => (b[1].t || 0) - (a[1].t || 0))
+      .slice(0, CARD_INFO_MAX);
+
+    const cards = {};
+    for (const [id, eintrag] of behalten) {
+      cards[id] = eintrag;
+    }
+    try {
+      localStorage.setItem(CARD_INFO_KEY, JSON.stringify({ v: 1, cards }));
+    } catch {
+      // Voller Speicher: die Ablage fliegt raus, im Arbeitsspeicher bleibt
+      // alles erhalten. Beim nächsten Mal wird wieder gefragt.
+      localStorage.removeItem(CARD_INFO_KEY);
+    }
+  }, 400);
+}
+
+ladeCardInfo();
+
 async function ensureLegality(ids) {
   const fehlende = [...new Set(ids)].filter((id) => id && !cardInfoCache.has(id));
   if (!fehlende.length) {
@@ -1925,16 +1988,25 @@ async function ensureLegality(ids) {
         typeLine: card.type_line || "",
         colorIdentity: card.color_identity || [],
         // Bei doppelseitigen Karten steht oben keine Manakosten, nur je Seite.
-        manaCost: card.mana_cost || card.card_faces?.[0]?.mana_cost || ""
+        manaCost: card.mana_cost || card.card_faces?.[0]?.mana_cost || "",
+        t: Date.now()
       });
     }
     // Was Scryfall nicht kennt, wird nicht als Fehler gewertet.
     for (const id of teil) {
       if (!cardInfoCache.has(id)) {
-        cardInfoCache.set(id, { legality: "unknown", typeLine: "", colorIdentity: null, manaCost: "" });
+        cardInfoCache.set(id, {
+          legality: "unknown",
+          typeLine: "",
+          colorIdentity: null,
+          manaCost: "",
+          t: Date.now()
+        });
       }
     }
   }
+
+  speichereCardInfo();
 }
 
 // Die Farbidentität wird als WUBRG-Kürzel angezeigt, farblos als C.
@@ -2270,22 +2342,22 @@ async function applyLands() {
       .map((wunsch) => wunsch.name);
     const gefunden = fehlende.length ? (await lookupCardsByName(fehlende)).found : new Map();
 
-    let ergebnis = null;
+    // Alles in einem Zug: eine Anfrage statt einer je Farbe.
+    const stapel = [];
     for (const wunsch of wuensche) {
       const imDeck = state.activeDeckCards.find((karte) => karte.name === wunsch.name);
       if (wunsch.anzahl === 0) {
-        if (imDeck) ergebnis = await deckStore.removeCard(state.activeDeck.id, imDeck.id);
+        if (imDeck) stapel.push({ card: imDeck, quantity: 0 });
         continue;
       }
-      const karte = imDeck || (() => {
-        const treffer = gefunden.get(wunsch.name.toLowerCase());
-        return treffer ? deckCardFromScryfall(treffer) : null;
-      })();
-      if (!karte) continue;
-      ergebnis = await deckStore.putCard(state.activeDeck.id, karte, wunsch.anzahl);
+      const treffer = gefunden.get(wunsch.name.toLowerCase());
+      const karte = imDeck || (treffer ? deckCardFromScryfall(treffer) : null);
+      if (karte) stapel.push({ card: karte, quantity: wunsch.anzahl });
     }
 
-    if (ergebnis) applyDeckResult(ergebnis);
+    if (stapel.length) {
+      applyDeckResult(await deckStore.putCards(state.activeDeck.id, stapel));
+    }
     const gesetzt = wuensche.reduce((summe, wunsch) => summe + wunsch.anzahl, 0);
     setLandsStatus(t("{count} Standardländer gesetzt.", { count: gesetzt }), "ok");
     renderLandsSplit(

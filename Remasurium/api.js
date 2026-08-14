@@ -64,6 +64,21 @@ export const api = {
   updateDeck: (id, changes) => call(`/decks/${encodeURIComponent(id)}`, { method: "PATCH", body: changes }),
   deleteDeck: (id) => call(`/decks/${encodeURIComponent(id)}`, { method: "DELETE" }),
   mergeDecks: (decks) => call("/decks/merge", { method: "POST", body: { decks } }),
+  // Mehrere Karten in einer Anfrage. Menge 0 nimmt eine Karte heraus.
+  putDeckCards: (id, cards) =>
+    call(`/decks/${encodeURIComponent(id)}/cards`, {
+      method: "PUT",
+      body: {
+        cards: cards.map(({ card, quantity }) => ({
+          id: card.id,
+          name: card.name,
+          set_name: card.set_name,
+          image: card.image,
+          unlimited: Boolean(card.unlimited),
+          quantity
+        }))
+      }
+    }),
   putDeckCard: (id, card, quantity) =>
     call(`/decks/${encodeURIComponent(id)}/cards/${encodeURIComponent(card.id)}`, {
       method: "PUT",

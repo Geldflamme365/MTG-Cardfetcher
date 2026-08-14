@@ -197,6 +197,36 @@ export function createDeckStore({ isLoggedIn }) {
       return localResult(deck);
     },
 
+    // Mehrere Karten auf einmal setzen. Menge 0 nimmt eine Karte heraus.
+    // Angemeldet ist das eine Anfrage statt einer je Karte.
+    async putCards(id, wuensche) {
+      if (!wuensche.length) {
+        return this.get(id);
+      }
+      if (isLoggedIn()) {
+        return api.putDeckCards(id, wuensche);
+      }
+
+      const decks = loadLocal();
+      const deck = findLocal(decks, id);
+      deck.cards = deck.cards || [];
+
+      const betroffen = new Set(wuensche.map(({ card }) => card.id));
+      const eintraege = wuensche
+        .filter(({ quantity }) => quantity > 0)
+        .map(({ card, quantity }) => cardEntry(deck, card, quantity));
+      const uebrige = deck.cards.filter((item) => !betroffen.has(item.id));
+
+      if (countCards(uebrige) + countCards(eintraege) > MAX_DECK_CARDS) {
+        throw new Error(`Ein Deck fasst höchstens ${MAX_DECK_CARDS} Karten.`);
+      }
+
+      deck.cards = [...eintraege, ...uebrige];
+      deck.updatedAt = new Date().toISOString();
+      saveLocal(decks);
+      return localResult(deck);
+    },
+
     async removeCard(id, cardId) {
       if (isLoggedIn()) {
         return api.deleteDeckCard(id, cardId);

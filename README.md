@@ -85,6 +85,7 @@ sends it automatically, so you do not have to handle it yourself.
 | GET | `/decks/:id` | One deck with all its cards |
 | PATCH | `/decks/:id` | Rename a deck or set its commander |
 | DELETE | `/decks/:id` | Delete a deck |
+| PUT | `/decks/:id/cards` | Set several cards at once; quantity 0 takes one out |
 | PUT | `/decks/:id/cards/:cardId` | Add a card or change how many copies |
 | DELETE | `/decks/:id/cards/:cardId` | Take a card out |
 | POST | `/decks/merge` | Copy local decks up when you log in |

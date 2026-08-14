@@ -680,6 +680,92 @@ async function handlePutDeckCard(request, env, user, deckId, cardId) {
   return handleGetDeck(env, user, deckId);
 }
 
+// Mehrere Karten in einem Zug setzen. Das spart bei Aktionen wie
+// "Länder optimieren" fünf bis sechs einzelne Anfragen, die je das ganze
+// Deck gelesen und geschrieben hätten. Menge 0 heisst: raus aus dem Deck.
+async function handlePutDeckCards(request, env, user, deckId) {
+  const deck = await findDeck(env, user.id, deckId);
+  if (!deck) {
+    return fail("Deck nicht gefunden.", 404);
+  }
+
+  const body = await readJson(request);
+  const input = Array.isArray(body?.cards) ? body.cards : null;
+  if (!input) {
+    return fail("Erwartet wird ein Feld 'cards' mit einer Liste.");
+  }
+  if (input.length > 200) {
+    return fail("Höchstens 200 Karten auf einmal.");
+  }
+
+  const eintraege = [];
+  for (const roh of input) {
+    const card = cardFromInput(roh);
+    if (!card) {
+      return fail("Kartendaten unvollständig.");
+    }
+    const unlimited = Boolean(roh?.unlimited);
+    const menge = Number(roh?.quantity);
+    eintraege.push({
+      card,
+      unlimited,
+      // Menge 0 muss durchkommen, limitQuantity würde daraus eine 1 machen.
+      quantity: menge === 0 ? 0 : limitQuantity(deck, { unlimited }, menge)
+    });
+  }
+
+  if (!eintraege.length) {
+    return handleGetDeck(env, user, deckId);
+  }
+
+  // Wie viel liegt im Deck, das dieser Aufruf nicht anfasst?
+  const platzhalter = eintraege.map(() => "?").join(", ");
+  const rest = await env.DB.prepare(
+    `SELECT COALESCE(SUM(quantity), 0) AS n FROM deck_cards
+     WHERE deck_id = ? AND card_id NOT IN (${platzhalter})`
+  )
+    .bind(deckId, ...eintraege.map((eintrag) => eintrag.card.id))
+    .first();
+
+  const neu = eintraege.reduce((summe, eintrag) => summe + eintrag.quantity, 0);
+  if ((rest?.n || 0) + neu > MAX_DECK_CARDS) {
+    return fail(`Ein Deck fasst höchstens ${MAX_DECK_CARDS} Karten.`, 409);
+  }
+
+  const jetzt = new Date().toISOString();
+  const anweisungen = eintraege.map((eintrag) =>
+    eintrag.quantity === 0
+      ? env.DB.prepare("DELETE FROM deck_cards WHERE deck_id = ? AND card_id = ?").bind(
+          deckId,
+          eintrag.card.id
+        )
+      : env.DB.prepare(
+          `INSERT INTO deck_cards (deck_id, card_id, name, set_name, image, quantity, unlimited, added_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (deck_id, card_id) DO UPDATE SET
+             name = excluded.name,
+             set_name = excluded.set_name,
+             image = excluded.image,
+             quantity = excluded.quantity,
+             unlimited = excluded.unlimited`
+        ).bind(
+          deckId,
+          eintrag.card.id,
+          eintrag.card.name,
+          eintrag.card.set_name,
+          eintrag.card.image,
+          eintrag.quantity,
+          eintrag.unlimited ? 1 : 0,
+          jetzt
+        )
+  );
+
+  // Ein Rundgang zur Datenbank statt einer je Karte.
+  await env.DB.batch(anweisungen);
+  await touchDeck(env, deckId);
+  return handleGetDeck(env, user, deckId);
+}
+
 async function handleDeleteDeckCard(env, user, deckId, cardId) {
   const deck = await findDeck(env, user.id, deckId);
   if (!deck) {
@@ -946,6 +1032,11 @@ async function handleApi(request, env, url) {
     if (method === "DELETE") {
       return handleDeleteDeck(env, user, deckId);
     }
+  }
+
+  const deckCardsMatch = path.match(/^\/decks\/([^/]+)\/cards$/);
+  if (deckCardsMatch && method === "PUT") {
+    return handlePutDeckCards(request, env, user, decodeURIComponent(deckCardsMatch[1]));
   }
 
   const deckCardMatch = path.match(/^\/decks\/([^/]+)\/cards\/([^/]+)$/);
