@@ -24,6 +24,9 @@ const state = {
   searchPage: 0,
   searchNextUrl: null,
   searchTotal: 0,
+  deckSearchPage: 0,
+  deckSearchNextUrl: null,
+  deckSearchTotal: 0,
   deckProblems: [],
   // Die Karten-Ids aus den Problemen, damit sie im Deck rot umrandet werden.
   deckProblemCards: new Set(),
@@ -520,6 +523,63 @@ function searchPageCount() {
   return Math.max(1, Math.ceil(gesamt / SEARCH_PAGE_SIZE));
 }
 
+function setDeckResults(cards, { nextUrl = null, total = null } = {}) {
+  state.deckResults = cards;
+  state.deckSearchPage = 0;
+  state.deckSearchNextUrl = nextUrl;
+  state.deckSearchTotal = total ?? cards.length;
+}
+
+function deckSearchPageCount() {
+  const gesamt = Math.max(state.deckSearchTotal, state.deckResults.length);
+  return Math.max(1, Math.ceil(gesamt / SEARCH_PAGE_SIZE));
+}
+
+// Blätterleiste für beide Suchen.
+function pagerMarkup(seite, seiten) {
+  if (seiten <= 1) {
+    return "";
+  }
+  return `
+    <div class="pager">
+      <button type="button" class="retro-button" data-page="prev"${seite === 0 ? " disabled" : ""}>&lt; Zurück</button>
+      <span class="pager-state">${escapeHtml(
+        t("Seite {page} von {pages}", { page: seite + 1, pages: seiten })
+      )}</span>
+      <button type="button" class="retro-button" data-page="next"${seite >= seiten - 1 ? " disabled" : ""}>Weiter &gt;</button>
+    </div>
+    <p class="small-note pager-hint">Auf dem Handy kannst du auch seitwärts wischen.</p>
+  `;
+}
+
+// Wischgesten für einen Ergebnisbereich. Nur deutlich waagrechte und lang
+// genug gezogene Gesten zählen, sonst würde Scrollen umblättern.
+function bindeWischen(bereich, blaettern) {
+  let start = null;
+  bereich.addEventListener(
+    "touchstart",
+    (event) => {
+      start = event.touches.length === 1
+        ? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+        : null;
+    },
+    { passive: true }
+  );
+  bereich.addEventListener(
+    "touchend",
+    (event) => {
+      if (!start) return;
+      const punkt = event.changedTouches[0];
+      const dx = punkt.clientX - start.x;
+      const dy = punkt.clientY - start.y;
+      start = null;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      blaettern(dx < 0 ? 1 : -1);
+    },
+    { passive: true }
+  );
+}
+
 function updateResultCount() {
   // Angezeigt wird, was es insgesamt gibt, nicht was gerade geladen ist.
   const anzahl = Math.max(state.searchTotal, state.results.length);
@@ -696,18 +756,7 @@ function renderResults() {
         })
         .join("")}
     </div>
-    ${
-      seiten > 1
-        ? `<div class="pager">
-             <button type="button" class="retro-button" data-page="prev"${state.searchPage === 0 ? " disabled" : ""}>&lt; Zurück</button>
-             <span class="pager-state">${escapeHtml(
-               t("Seite {page} von {pages}", { page: state.searchPage + 1, pages: seiten })
-             )}</span>
-             <button type="button" class="retro-button" data-page="next"${state.searchPage >= seiten - 1 ? " disabled" : ""}>Weiter &gt;</button>
-           </div>
-           <p class="small-note pager-hint">Auf dem Handy kannst du auch seitwärts wischen.</p>`
-        : ""
-    }
+    ${pagerMarkup(state.searchPage, seiten)}
   `;
 
   for (const btn of els.results.querySelectorAll("button[data-page]")) {
@@ -2861,18 +2910,57 @@ async function selectDeckSearchCard(card) {
   }
 }
 
+// Blättert im Suchfenster des Deck-Editors und lädt dafür nach.
+async function gotoDeckSearchPage(seite) {
+  const ziel = Math.max(0, Math.min(seite, deckSearchPageCount() - 1));
+  if (ziel === state.deckSearchPage) {
+    return;
+  }
+
+  const gebraucht = (ziel + 1) * SEARCH_PAGE_SIZE;
+  while (state.deckResults.length < gebraucht && state.deckSearchNextUrl) {
+    setDeckStatus(t("Lade weitere Treffer..."), "muted");
+    try {
+      const weitere = await ladeSuchseite(state.deckSearchNextUrl);
+      state.deckResults = [...state.deckResults, ...weitere.cards];
+      state.deckSearchNextUrl = weitere.nextUrl;
+    } catch (error) {
+      setDeckStatus(t("Weitere Treffer konnten nicht geladen werden: {error}", { error: error.message }), "err");
+      break;
+    }
+  }
+
+  state.deckSearchPage = ziel;
+  renderDeckSearchResults();
+  els.deckSearchResults.scrollIntoView({ block: "start", behavior: "smooth" });
+  setDeckStatus(
+    t("Seite {page} von {pages}, {count} Treffer insgesamt.", {
+      page: ziel + 1,
+      pages: deckSearchPageCount(),
+      count: Math.max(state.deckSearchTotal, state.deckResults.length)
+    }),
+    "ok"
+  );
+}
+
 function renderDeckSearchResults() {
   const results = state.deckResults;
-  els.deckSearchCount.textContent = `${results.length} ${results.length === 1 ? "card" : "cards"}`;
+  // Angezeigt wird, was es insgesamt gibt, nicht was gerade geladen ist.
+  const anzahl = Math.max(state.deckSearchTotal, results.length);
+  els.deckSearchCount.textContent = `${anzahl} ${anzahl === 1 ? "card" : "cards"}`;
 
   if (!results.length) {
     els.deckSearchResults.innerHTML = `<div class="empty-state">Noch keine Treffer.</div>`;
     return;
   }
 
+  const seiten = deckSearchPageCount();
+  const start = state.deckSearchPage * SEARCH_PAGE_SIZE;
+
   els.deckSearchResults.innerHTML = `
     <div class="search-grid">
       ${results
+        .slice(start, start + SEARCH_PAGE_SIZE)
         .map((card) => {
           const preview = getCardPreviewUrl(card);
           return `
@@ -2890,7 +2978,14 @@ function renderDeckSearchResults() {
         })
         .join("")}
     </div>
+    ${pagerMarkup(state.deckSearchPage, seiten)}
   `;
+
+  for (const btn of els.deckSearchResults.querySelectorAll("button[data-page]")) {
+    btn.addEventListener("click", () => {
+      gotoDeckSearchPage(state.deckSearchPage + (btn.dataset.page === "next" ? 1 : -1));
+    });
+  }
 
   for (const tile of els.deckSearchResults.querySelectorAll("button[data-add]")) {
     tile.addEventListener("click", () => {
@@ -2910,14 +3005,23 @@ async function runDeckSearch() {
   setDeckStatus(`Suche nach ${query}...`, "muted");
   try {
     const result = await searchCardsWithTolerance(query);
-    state.deckResults = result.cards;
+    setDeckResults(result.cards, { nextUrl: result.nextUrl, total: result.total });
     renderDeckSearchResults();
-    setDeckStatus(
-      state.deckResults.length ? `${state.deckResults.length} Treffer.` : "Keine Treffer gefunden.",
-      state.deckResults.length ? "ok" : "err"
-    );
+    if (!state.deckResults.length) {
+      setDeckStatus("Keine Treffer gefunden.", "err");
+    } else if (deckSearchPageCount() > 1) {
+      setDeckStatus(
+        t("{count} Treffer gefunden, aufgeteilt auf {pages} Seiten.", {
+          count: state.deckSearchTotal,
+          pages: deckSearchPageCount()
+        }),
+        "ok"
+      );
+    } else {
+      setDeckStatus(`${state.deckResults.length} Treffer.`, "ok");
+    }
   } catch (error) {
-    state.deckResults = [];
+    setDeckResults([]);
     renderDeckSearchResults();
     setDeckStatus(`Fehler bei der Suche: ${error.message}`, "err");
   }
@@ -3361,33 +3465,11 @@ els.toggleSearchBtn.addEventListener("click", () => {
 state.deckSearchCollapsed = localStorage.getItem(SEARCH_COLLAPSE_KEY) === "1";
 applySearchCollapse();
 
-// Seitwärts wischen blättert durch die Ergebnisse. Der Bereich wird einmal
-// verdrahtet, nicht bei jedem Zeichnen neu.
-let wischStart = null;
-
-els.results.addEventListener(
-  "touchstart",
-  (event) => {
-    wischStart = event.touches.length === 1
-      ? { x: event.touches[0].clientX, y: event.touches[0].clientY }
-      : null;
-  },
-  { passive: true }
-);
-
-els.results.addEventListener(
-  "touchend",
-  (event) => {
-    if (!wischStart) return;
-    const punkt = event.changedTouches[0];
-    const dx = punkt.clientX - wischStart.x;
-    const dy = punkt.clientY - wischStart.y;
-    wischStart = null;
-    // Deutlich waagrecht und lang genug, sonst würde Scrollen umblättern.
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    gotoSearchPage(state.searchPage + (dx < 0 ? 1 : -1));
-  },
-  { passive: true }
+// Wischen blättert in beiden Suchen. Einmal verdrahtet, nicht bei jedem
+// Zeichnen neu.
+bindeWischen(els.results, (richtung) => gotoSearchPage(state.searchPage + richtung));
+bindeWischen(els.deckSearchResults, (richtung) =>
+  gotoDeckSearchPage(state.deckSearchPage + richtung)
 );
 
 els.openLandsBtn.addEventListener("click", openLandsModal);
@@ -3432,6 +3514,7 @@ function updateLangToggle() {
 // deshalb nicht, sie müssen neu erzeugt werden.
 function rerenderDynamicText() {
   renderResults();
+  renderDeckSearchResults();
   renderCollection();
   renderDeckList();
   renderAccount();
