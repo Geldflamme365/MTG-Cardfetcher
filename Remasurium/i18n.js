@@ -142,8 +142,14 @@ const EN = {
     "This still runs on a test server. When several people are on it at the same time, the speed can vary.",
   "Das Projekt wird laufend weitergebaut. Was als Nächstes ansteht:":
     "The project keeps growing. What is coming next:",
-  "Die Deck-Ansicht ist noch in Arbeit, der Deck-Editor wird optisch überarbeitet.":
-    "The deck section is still being built, and the deck editor is due a visual pass.",
+  "Eine Scan-Funktion fürs Handy, um Karten mit der Kamera aufzunehmen.":
+    "A scan function for phones, to capture cards with the camera.",
+  "Preise über die Cardmarket-API.": "Prices through the Cardmarket API.",
+  "Ein Spielzähler: Format wählen, Lebenspunkte mitschreiben, Spielerzahl einstellen.":
+    "A game tracker: pick a format, keep life totals, set the number of players.",
+  "Bessere Kartenvorschläge je Commander, mit Daten von EDHREC.":
+    "Better card suggestions per commander, using EDHREC data.",
+  "Ein Playtester zum Goldfishing.": "A playtester for goldfishing.",
   "Weitere Formate neben Commander: Standard, Modern und Pauper.":
     "More formats besides Commander: Standard, Modern and Pauper.",
   "Ein Login-Limit gegen Passwort-Raten steht, ein Passwort-Reset per Mail fehlt noch.":
