@@ -1188,6 +1188,50 @@ body.is-splitting {
   font-size: 0.92rem;
 }
 
+/* Zahlenblock im Länderfenster: Begriff links, Wert rechtsbündig. */
+.lands-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  background: #ece8de;
+  border: 2px solid;
+  border-color: #8d887e var(--edge-light) var(--edge-light) #8d887e;
+  font-size: 0.9rem;
+}
+
+.lands-facts dt {
+  color: var(--muted);
+}
+
+.lands-facts dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lands-split {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.lands-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px 72px;
+  gap: 8px;
+  align-items: center;
+}
+
+.lands-share {
+  color: var(--muted);
+  text-align: right;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .legality-list {
   display: grid;
   gap: 8px;

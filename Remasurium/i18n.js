@@ -173,6 +173,25 @@ const EN = {
   "Feedback löschen": "Delete feedback",
   "Feedback gelöscht.": "Feedback deleted.",
 
+  // Länder optimieren
+  "Länder optimieren": "Optimize lands",
+  "länder optimieren": "optimize lands",
+  "Wie viele Länder soll das Deck haben?": "How many lands should the deck have?",
+  "Neu verteilen": "Redistribute",
+  "Standardländer je Farbe": "Basic lands per colour",
+  "Standardländer setzen": "Set basic lands",
+  "Länder ohne Standardländer": "Lands other than basics",
+  "Standardländer jetzt": "Basic lands now",
+  "Standardländer danach": "Basic lands after",
+  "Länder danach insgesamt": "Lands after, in total",
+  "Noch nichts geändert.": "Nothing changed yet.",
+  "Wird gesetzt...": "Setting...",
+  "{count} Standardländer gesetzt.": "{count} basic lands set.",
+  "Das Deck hat keine farbigen Manasymbole, es gibt nichts zu verteilen.":
+    "The deck has no coloured mana symbols, so there is nothing to distribute.",
+  "Die Verteilung folgt den farbigen Manasymbolen im Deck. Ein Symbol wie {W/U} zählt für beide Farben je zur Hälfte. Die Zahlen lassen sich von Hand überschreiben, gesetzt wird immer das, was in den Feldern steht.":
+    "The split follows the coloured mana symbols in the deck. A symbol like {W/U} counts half for each of its colours. The numbers can be overwritten by hand; what is in the fields is what gets set.",
+
   // Regelprüfung
   "legal": "legal",
   "nicht legal": "not legal",

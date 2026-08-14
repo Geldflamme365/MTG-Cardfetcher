@@ -107,6 +107,15 @@ const els = {
   reviewList: document.getElementById("reviewList"),
   toggleSearchBtn: document.getElementById("toggleSearchBtn"),
   legalityBadge: document.getElementById("legalityBadge"),
+  openLandsBtn: document.getElementById("openLandsBtn"),
+  landsModal: document.getElementById("landsModal"),
+  landsModalCloseBtn: document.getElementById("landsModalCloseBtn"),
+  landsTotal: document.getElementById("landsTotal"),
+  landsRecalcBtn: document.getElementById("landsRecalcBtn"),
+  landsFacts: document.getElementById("landsFacts"),
+  landsSplit: document.getElementById("landsSplit"),
+  landsStatus: document.getElementById("landsStatus"),
+  landsApplyBtn: document.getElementById("landsApplyBtn"),
   legalityModal: document.getElementById("legalityModal"),
   legalityModalCloseBtn: document.getElementById("legalityModalCloseBtn"),
   legalitySummary: document.getElementById("legalitySummary"),
@@ -1914,13 +1923,15 @@ async function ensureLegality(ids) {
       cardInfoCache.set(card.id, {
         legality: card.legalities?.commander || "unknown",
         typeLine: card.type_line || "",
-        colorIdentity: card.color_identity || []
+        colorIdentity: card.color_identity || [],
+        // Bei doppelseitigen Karten steht oben keine Manakosten, nur je Seite.
+        manaCost: card.mana_cost || card.card_faces?.[0]?.mana_cost || ""
       });
     }
     // Was Scryfall nicht kennt, wird nicht als Fehler gewertet.
     for (const id of teil) {
       if (!cardInfoCache.has(id)) {
-        cardInfoCache.set(id, { legality: "unknown", typeLine: "", colorIdentity: null });
+        cardInfoCache.set(id, { legality: "unknown", typeLine: "", colorIdentity: null, manaCost: "" });
       }
     }
   }
@@ -2042,6 +2053,250 @@ async function checkDeckLegality() {
   } catch {
     // Ohne Scryfall bleiben Grösse und Mengen geprüft, verbotene Karten
     // lassen sich dann nicht beurteilen.
+  }
+}
+
+// --- Länder optimieren ---------------------------------------------------
+// Die Standardländer werden nach den farbigen Manasymbolen im Deck verteilt.
+
+const BASIC_LANDS = [
+  { farbe: "W", name: "Plains", label: "Weiss" },
+  { farbe: "U", name: "Island", label: "Blau" },
+  { farbe: "B", name: "Swamp", label: "Schwarz" },
+  { farbe: "R", name: "Mountain", label: "Rot" },
+  { farbe: "G", name: "Forest", label: "Grün" }
+];
+
+// Ein farbloses Deck hat keine der fünf Farben, spielt aber Standardländer.
+const WASTES = { farbe: "C", name: "Wastes", label: "Farblos" };
+
+function landZuFarbe(farbe) {
+  return farbe === WASTES.farbe ? WASTES : BASIC_LANDS.find((eintrag) => eintrag.farbe === farbe);
+}
+
+function istStandardland(karte) {
+  const typ = cardInfoCache.get(karte.id)?.typeLine || "";
+  return /\bBasic\b/i.test(typ) && hatTyp(typ, "Land");
+}
+
+function istLand(karte) {
+  return hatTyp(cardInfoCache.get(karte.id)?.typeLine || "", "Land");
+}
+
+// Zählt die farbigen Symbole einer Manakosten-Zeichenkette. Hybride teilen
+// sich ihr Gewicht, sonst würde {W/U} für beide Farben voll zählen.
+function zaehlePips(manaCost) {
+  const summe = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+  for (const symbol of manaCost.match(/\{[^}]+\}/g) || []) {
+    const teile = symbol.slice(1, -1).split("/");
+    const farben = teile.filter((teil) => teil in summe);
+    for (const farbe of farben) {
+      summe[farbe] += 1 / farben.length;
+    }
+  }
+  return summe;
+}
+
+function deckPips() {
+  const summe = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+  const commander = state.activeDeck?.commander;
+  const alle = [
+    ...(commander ? [{ id: commander.id, quantity: 1 }] : []),
+    ...state.activeDeckCards
+  ];
+  for (const karte of alle) {
+    const kosten = cardInfoCache.get(karte.id)?.manaCost || "";
+    const einzeln = zaehlePips(kosten);
+    for (const farbe of Object.keys(summe)) {
+      summe[farbe] += einzeln[farbe] * karte.quantity;
+    }
+  }
+  return summe;
+}
+
+// Welche Farben im Fenster auftauchen: die Farbidentität des Commanders,
+// sonst die Farben, für die das Deck überhaupt Symbole hat. Dazu jede Farbe,
+// von der schon Standardländer im Deck liegen, damit man sie leeren kann.
+function landfarben() {
+  const commander = state.activeDeck?.commander;
+  const identitaet = commander && cardInfoCache.get(commander.id)?.colorIdentity;
+  const pips = deckPips();
+  const basis = identitaet?.length
+    ? identitaet
+    : BASIC_LANDS.filter((eintrag) => pips[eintrag.farbe] > 0).map((eintrag) => eintrag.farbe);
+
+  const vorhanden = new Set(
+    state.activeDeckCards
+      .filter(istStandardland)
+      .map((karte) => BASIC_LANDS.find((eintrag) => eintrag.name === karte.name)?.farbe)
+      .filter(Boolean)
+  );
+
+  const liste = BASIC_LANDS.filter(
+    (eintrag) => basis.includes(eintrag.farbe) || vorhanden.has(eintrag.farbe)
+  );
+  return liste.length ? liste : [WASTES];
+}
+
+// Grösste Reste: erst abrunden, dann die übrigen Plätze an die grössten
+// Nachkommateile vergeben. So stimmt die Summe immer genau.
+function verteileNachAnteil(gesamt, gewichte) {
+  if (gesamt <= 0 || !gewichte.length) return gewichte.map(() => 0);
+
+  const summe = gewichte.reduce((a, b) => a + b, 0);
+  // Farben ohne ein einziges Symbol im Deck teilen sich gleichmässig auf.
+  const anteile = summe > 0 ? gewichte : gewichte.map(() => 1);
+  const teiler = summe > 0 ? summe : gewichte.length;
+
+  const roh = anteile.map((gewicht) => (gewicht / teiler) * gesamt);
+  const ganz = roh.map(Math.floor);
+  let rest = gesamt - ganz.reduce((a, b) => a + b, 0);
+  const reihenfolge = roh
+    .map((wert, index) => ({ index, rest: wert - Math.floor(wert) }))
+    .sort((a, b) => b.rest - a.rest);
+
+  for (const eintrag of reihenfolge) {
+    if (rest <= 0) break;
+    ganz[eintrag.index] += 1;
+    rest -= 1;
+  }
+  return ganz;
+}
+
+function landZahlen() {
+  const karten = state.activeDeckCards;
+  const laender = karten.filter(istLand);
+  const standard = laender.filter(istStandardland);
+  const menge = (liste) => liste.reduce((summe, karte) => summe + karte.quantity, 0);
+  return {
+    laenderGesamt: menge(laender),
+    standard: menge(standard),
+    nichtStandard: menge(laender) - menge(standard)
+  };
+}
+
+function landsVorschlag(zielGesamt) {
+  const farben = landfarben();
+  const pips = deckPips();
+  const { nichtStandard } = landZahlen();
+  const zuVerteilen = Math.max(0, zielGesamt - nichtStandard);
+  const anzahlen = verteileNachAnteil(
+    zuVerteilen,
+    farben.map((eintrag) => pips[eintrag.farbe] ?? 0)
+  );
+  return farben.map((eintrag, index) => ({
+    ...eintrag,
+    pips: pips[eintrag.farbe] ?? 0,
+    anzahl: anzahlen[index]
+  }));
+}
+
+function renderLandsFacts() {
+  const { nichtStandard, standard } = landZahlen();
+  const eingaben = [...els.landsSplit.querySelectorAll("input[data-farbe]")];
+  const danach = eingaben.reduce((summe, feld) => summe + (Number(feld.value) || 0), 0);
+
+  const zeilen = [
+    [t("Länder ohne Standardländer"), nichtStandard],
+    [t("Standardländer jetzt"), standard],
+    [t("Standardländer danach"), danach],
+    [t("Länder danach insgesamt"), nichtStandard + danach]
+  ];
+  els.landsFacts.innerHTML = zeilen
+    .map(([begriff, wert]) => `<dt>${escapeHtml(begriff)}</dt><dd>${wert}</dd>`)
+    .join("");
+}
+
+function renderLandsSplit(vorschlag) {
+  // Farbloses Deck: es gibt keine Standardländer zu verteilen.
+  if (!vorschlag.length) {
+    els.landsSplit.innerHTML = `<div class="empty-state">Das Deck hat keine farbigen Manasymbole, es gibt nichts zu verteilen.</div>`;
+    renderLandsFacts();
+    return;
+  }
+
+  const gesamtPips = vorschlag.reduce((summe, eintrag) => summe + eintrag.pips, 0);
+  els.landsSplit.innerHTML = vorschlag
+    .map((eintrag) => {
+      // Ohne farbige Symbole im Deck gibt es keinen Anteil zu zeigen.
+      const anteil = gesamtPips > 0 ? `${Math.round((eintrag.pips / gesamtPips) * 100)}%` : "–";
+      return `
+        <label class="lands-row">
+          <span class="lands-name">${escapeHtml(eintrag.name)}</span>
+          <span class="lands-share">${anteil}</span>
+          <input type="number" min="0" max="99" step="1" data-farbe="${eintrag.farbe}" value="${eintrag.anzahl}" />
+        </label>
+      `;
+    })
+    .join("");
+
+  for (const feld of els.landsSplit.querySelectorAll("input[data-farbe]")) {
+    feld.addEventListener("input", renderLandsFacts);
+  }
+  renderLandsFacts();
+}
+
+function openLandsModal() {
+  if (!state.activeDeck) return;
+  const { laenderGesamt } = landZahlen();
+  // 36 ist der übliche Richtwert im Commander. Wer schon mehr Länder hat,
+  // startet bei seiner eigenen Zahl und verliert so keine.
+  els.landsTotal.value = Math.max(laenderGesamt, 36);
+  setLandsStatus(t("Noch nichts geändert."), "muted");
+  renderLandsSplit(landsVorschlag(Number(els.landsTotal.value)));
+  openModal(els.landsModal);
+  els.landsTotal.focus();
+}
+
+function setLandsStatus(text, art = "muted") {
+  els.landsStatus.textContent = text;
+  els.landsStatus.className = `status ${art}`;
+}
+
+async function applyLands() {
+  if (!state.activeDeck) return;
+  const wuensche = [...els.landsSplit.querySelectorAll("input[data-farbe]")].map((feld) => ({
+    farbe: feld.dataset.farbe,
+    name: landZuFarbe(feld.dataset.farbe).name,
+    anzahl: Math.max(0, Math.min(99, Number(feld.value) || 0))
+  }));
+
+  setLandsStatus(t("Wird gesetzt..."), "muted");
+  try {
+    // Nur die Länder nachschlagen, die noch nicht im Deck liegen.
+    const fehlende = wuensche
+      .filter((wunsch) => wunsch.anzahl > 0)
+      .filter((wunsch) => !state.activeDeckCards.some((karte) => karte.name === wunsch.name))
+      .map((wunsch) => wunsch.name);
+    const gefunden = fehlende.length ? (await lookupCardsByName(fehlende)).found : new Map();
+
+    let ergebnis = null;
+    for (const wunsch of wuensche) {
+      const imDeck = state.activeDeckCards.find((karte) => karte.name === wunsch.name);
+      if (wunsch.anzahl === 0) {
+        if (imDeck) ergebnis = await deckStore.removeCard(state.activeDeck.id, imDeck.id);
+        continue;
+      }
+      const karte = imDeck || (() => {
+        const treffer = gefunden.get(wunsch.name.toLowerCase());
+        return treffer ? deckCardFromScryfall(treffer) : null;
+      })();
+      if (!karte) continue;
+      ergebnis = await deckStore.putCard(state.activeDeck.id, karte, wunsch.anzahl);
+    }
+
+    if (ergebnis) applyDeckResult(ergebnis);
+    const gesetzt = wuensche.reduce((summe, wunsch) => summe + wunsch.anzahl, 0);
+    setLandsStatus(t("{count} Standardländer gesetzt.", { count: gesetzt }), "ok");
+    renderLandsSplit(
+      wuensche.map((wunsch) => ({
+        ...landZuFarbe(wunsch.farbe),
+        pips: deckPips()[wunsch.farbe] ?? 0,
+        anzahl: wunsch.anzahl
+      }))
+    );
+  } catch (error) {
+    setLandsStatus(error.message, "err");
   }
 }
 
@@ -2935,6 +3190,17 @@ els.toggleSearchBtn.addEventListener("click", () => {
 
 state.deckSearchCollapsed = localStorage.getItem(SEARCH_COLLAPSE_KEY) === "1";
 applySearchCollapse();
+
+els.openLandsBtn.addEventListener("click", openLandsModal);
+els.landsModalCloseBtn.addEventListener("click", () => closeModal(els.landsModal));
+els.landsApplyBtn.addEventListener("click", applyLands);
+// Die Gesamtzahl verteilt neu, von Hand gesetzte Zahlen werden dabei ersetzt.
+els.landsRecalcBtn.addEventListener("click", () => {
+  renderLandsSplit(landsVorschlag(Number(els.landsTotal.value) || 0));
+});
+els.landsTotal.addEventListener("change", () => {
+  renderLandsSplit(landsVorschlag(Number(els.landsTotal.value) || 0));
+});
 
 els.legalityBadge.addEventListener("click", () => openModal(els.legalityModal));
 els.legalityModalCloseBtn.addEventListener("click", () => closeModal(els.legalityModal));

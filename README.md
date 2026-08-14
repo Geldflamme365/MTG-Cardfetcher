@@ -209,6 +209,22 @@ without editing. While reading a list:
 Export writes the commander first, so an exported deck can be read back in
 unchanged.
 
+### Optimize lands
+
+"Optimize lands" at the right end of the toolbar opens a window that fills the
+deck up with basic lands. You say how many lands the deck should have in total,
+and the basics are split along the coloured mana symbols in the deck, the
+commander counted in. A deck whose symbols are 71% black and 29% green gets its
+basics in the same ratio.
+
+Lands you already play are subtracted first, so only the remainder is filled
+with basics. A hybrid symbol like `{W/U}` counts half for each of its colours.
+The colours offered are the commander's colour identity; a colourless deck gets
+Wastes instead.
+
+Every number can be overwritten by hand, and what stands in the fields is what
+gets set. Setting a colour to zero takes those basics out of the deck.
+
 ### Rules check
 
 Next to "Delete deck" the editor shows whether the deck is legal. Red-orange

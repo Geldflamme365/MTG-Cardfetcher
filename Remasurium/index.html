@@ -279,6 +279,7 @@
                 <button id="openExportBtn" type="button" class="retro-button">Deck exportieren</button>
                 <button id="deleteDeckBtn" type="button" class="retro-button">Deck löschen</button>
                 <button id="legalityBadge" type="button" class="legality-badge" title="Regelprüfung anzeigen">wird geprüft</button>
+                <button id="openLandsBtn" type="button" class="retro-button">Länder optimieren</button>
               </div>
 
               <label class="field-label" for="deckNameInput">Deckname</label>
@@ -506,6 +507,42 @@
           <p class="small-note">Nur für das Adminkonto sichtbar.</p>
           <div id="reviewList" class="review-list"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="landsModal" class="modal" aria-hidden="true">
+    <div class="modal-dialog window modal-narrow" role="dialog" aria-modal="true" aria-label="Länder optimieren">
+      <div class="title-bar">
+        <span>länder optimieren</span>
+        <button id="landsModalCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label" for="landsTotal">Wie viele Länder soll das Deck haben?</label>
+        <div class="search-row">
+          <input id="landsTotal" type="number" min="0" max="99" step="1" />
+          <button id="landsRecalcBtn" type="button">Neu verteilen</button>
+        </div>
+
+        <dl id="landsFacts" class="lands-facts"></dl>
+
+        <span class="field-label spaced">Standardländer je Farbe</span>
+        <div id="landsSplit" class="lands-split"></div>
+
+        <div class="status-wrap">
+          <span class="field-label">Status</span>
+          <div id="landsStatus" class="status muted">Noch nichts geändert.</div>
+        </div>
+
+        <div class="button-row">
+          <button id="landsApplyBtn" type="button" class="retro-button">Standardländer setzen</button>
+        </div>
+
+        <p class="small-note">
+          Die Verteilung folgt den farbigen Manasymbolen im Deck. Ein Symbol wie
+          {W/U} zählt für beide Farben je zur Hälfte. Die Zahlen lassen sich von
+          Hand überschreiben, gesetzt wird immer das, was in den Feldern steht.
+        </p>
       </div>
     </div>
   </div>
