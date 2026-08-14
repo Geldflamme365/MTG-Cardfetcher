@@ -1352,6 +1352,21 @@ els.searchInput.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("hashchange", renderRoute);
+
+// Ein Klick auf den Menüpunkt, auf dem man schon steht, ändert die Adresse
+// nicht, also meldet der Browser auch keinen Wechsel. Ohne das hier bliebe
+// im Deck-Tab das offene Deck stehen, statt auf die Übersicht zu gehen.
+for (const link of els.navLinks) {
+  const href = link.getAttribute("href");
+  if (!href) {
+    continue;
+  }
+  link.addEventListener("click", () => {
+    if (normalizeRoute(href) === normalizeRoute(window.location.hash)) {
+      renderRoute();
+    }
+  });
+}
 // Escape schliesst zuerst nur das Versionsfenster, damit man nicht aus
 // der Detailansicht fliegt, bloss weil man die Auswahl wegklicken will.
 window.addEventListener("keydown", (event) => {
