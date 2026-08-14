@@ -19,6 +19,11 @@ const state = {
   deckResults: [],
   deckVersionCard: null,
   renamingDeckId: null,
+  // Blättern in den Suchergebnissen: geladene Karten, aktuelle Seite und
+  // die Adresse der nächsten Scryfall-Seite.
+  searchPage: 0,
+  searchNextUrl: null,
+  searchTotal: 0,
   deckProblems: [],
   // Die Karten-Ids aus den Problemen, damit sie im Deck rot umrandet werden.
   deckProblemCards: new Set(),
@@ -396,17 +401,28 @@ async function fetchRandomCard(query = "") {
   });
 }
 
+// Scryfall liefert je Antwort höchstens 175 Karten und dazu die Adresse
+// der nächsten Seite. Die wird mitgegeben, damit weitergeblättert werden
+// kann, und total_cards sagt, wie viele es insgesamt sind.
 async function searchCards(query) {
   const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards&order=released`;
+  return ladeSuchseite(url);
+}
+
+async function ladeSuchseite(url) {
   const response = await scryfallFetch(url);
   if (response.status === 404) {
-    return [];
+    return { cards: [], nextUrl: null, total: 0 };
   }
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
   const data = await response.json();
-  return data.data || [];
+  return {
+    cards: data.data || [],
+    nextUrl: data.has_more ? data.next_page : null,
+    total: data.total_cards ?? (data.data || []).length
+  };
 }
 
 function hasAdvancedScryfallSyntax(query) {
@@ -414,9 +430,9 @@ function hasAdvancedScryfallSyntax(query) {
 }
 
 async function searchCardsWithTolerance(query) {
-  const directResults = await searchCards(query);
-  if (directResults.length) {
-    return { cards: directResults, mode: "direct" };
+  const direkt = await searchCards(query);
+  if (direkt.cards.length) {
+    return { ...direkt, mode: "direct" };
   }
 
   if (hasAdvancedScryfallSyntax(query)) {
@@ -488,8 +504,26 @@ function getCardPreviewUrl(card) {
   );
 }
 
+// Eine Ergebnisseite fasst 60 Karten, Scryfall liefert 175 je Antwort.
+// Eine Abfrage reicht also für knapp drei Seiten.
+const SEARCH_PAGE_SIZE = 60;
+
+function setSearchResults(cards, { nextUrl = null, total = null } = {}) {
+  state.results = cards;
+  state.searchPage = 0;
+  state.searchNextUrl = nextUrl;
+  state.searchTotal = total ?? cards.length;
+}
+
+function searchPageCount() {
+  const gesamt = Math.max(state.searchTotal, state.results.length);
+  return Math.max(1, Math.ceil(gesamt / SEARCH_PAGE_SIZE));
+}
+
 function updateResultCount() {
-  const text = `${state.results.length} ${state.results.length === 1 ? "card" : "cards"}`;
+  // Angezeigt wird, was es insgesamt gibt, nicht was gerade geladen ist.
+  const anzahl = Math.max(state.searchTotal, state.results.length);
+  const text = `${anzahl} ${anzahl === 1 ? "card" : "cards"}`;
   els.resultCountOutputs.forEach((node) => {
     node.textContent = text;
   });
@@ -591,6 +625,40 @@ async function toggleCollection(card) {
   }
 }
 
+// Blättert auf eine Seite und lädt dafür so viele Scryfall-Seiten nach,
+// wie es braucht. Eine Antwort deckt fast drei Ergebnisseiten ab.
+async function gotoSearchPage(seite) {
+  const ziel = Math.max(0, Math.min(seite, searchPageCount() - 1));
+  if (ziel === state.searchPage) {
+    return;
+  }
+
+  const gebraucht = (ziel + 1) * SEARCH_PAGE_SIZE;
+  while (state.results.length < gebraucht && state.searchNextUrl) {
+    setStatus(t("Lade weitere Treffer..."), "muted");
+    try {
+      const weitere = await ladeSuchseite(state.searchNextUrl);
+      state.results = [...state.results, ...weitere.cards];
+      state.searchNextUrl = weitere.nextUrl;
+    } catch (error) {
+      setStatus(t("Weitere Treffer konnten nicht geladen werden: {error}", { error: error.message }), "err");
+      break;
+    }
+  }
+
+  state.searchPage = ziel;
+  renderResults();
+  els.results.scrollIntoView({ block: "start", behavior: "smooth" });
+  setStatus(
+    t("Seite {page} von {pages}, {count} Treffer insgesamt.", {
+      page: ziel + 1,
+      pages: searchPageCount(),
+      count: Math.max(state.searchTotal, state.results.length)
+    }),
+    "ok"
+  );
+}
+
 function renderResults() {
   updateResultCount();
 
@@ -599,9 +667,13 @@ function renderResults() {
     return;
   }
 
+  const seiten = searchPageCount();
+  const start = state.searchPage * SEARCH_PAGE_SIZE;
+  const aufDerSeite = state.results.slice(start, start + SEARCH_PAGE_SIZE);
+
   els.results.innerHTML = `
     <div class="search-grid">
-      ${state.results
+      ${aufDerSeite
         .map((card) => {
           const preview = getCardPreviewUrl(card);
           return `
@@ -624,7 +696,25 @@ function renderResults() {
         })
         .join("")}
     </div>
+    ${
+      seiten > 1
+        ? `<div class="pager">
+             <button type="button" class="retro-button" data-page="prev"${state.searchPage === 0 ? " disabled" : ""}>&lt; Zurück</button>
+             <span class="pager-state">${escapeHtml(
+               t("Seite {page} von {pages}", { page: state.searchPage + 1, pages: seiten })
+             )}</span>
+             <button type="button" class="retro-button" data-page="next"${state.searchPage >= seiten - 1 ? " disabled" : ""}>Weiter &gt;</button>
+           </div>
+           <p class="small-note pager-hint">Auf dem Handy kannst du auch seitwärts wischen.</p>`
+        : ""
+    }
   `;
+
+  for (const btn of els.results.querySelectorAll("button[data-page]")) {
+    btn.addEventListener("click", () => {
+      gotoSearchPage(state.searchPage + (btn.dataset.page === "next" ? 1 : -1));
+    });
+  }
 
   for (const btn of els.results.querySelectorAll("button[data-select]")) {
     btn.addEventListener("click", () => {
@@ -1091,12 +1181,20 @@ async function runSearch() {
   setStatus(`Suche nach ${query}...`, "muted");
   try {
     const result = await searchCardsWithTolerance(query);
-    state.results = result.cards;
+    setSearchResults(result.cards, { nextUrl: result.nextUrl, total: result.total });
     renderResults();
 
     if (state.results.length) {
       if (result.mode === "fuzzy" || result.mode === "autocomplete") {
         setStatus(`Kein exakter Treffer. Zeige ähnlichen Treffer: ${result.correctedName}`, "ok");
+      } else if (searchPageCount() > 1) {
+        setStatus(
+          t("{count} Treffer gefunden, aufgeteilt auf {pages} Seiten.", {
+            count: state.searchTotal,
+            pages: searchPageCount()
+          }),
+          "ok"
+        );
       } else {
         setStatus(`${state.results.length} Treffer gefunden.`, "ok");
       }
@@ -1107,7 +1205,7 @@ async function runSearch() {
       setStatus("Keine Treffer gefunden.", "err");
     }
   } catch (error) {
-    state.results = [];
+    setSearchResults([]);
     state.searchSelection = null;
     state.searchPrints = [];
     renderResults();
@@ -1125,7 +1223,7 @@ async function loadRandomCard() {
     // es gibt sehr viele davon. -t:basic erfasst auch die verschneiten
     // Varianten, denn die tragen dieselbe Typangabe.
     const card = await fetchRandomCard("-t:basic");
-    state.results = [card];
+    setSearchResults([card]);
     renderResults();
     await selectSearchCard(card);
     setStatus(t("Zufallskarte geladen: {name}", { name: card.name }), "ok");
@@ -1147,7 +1245,7 @@ async function loadRandomCommander() {
 
   try {
     const card = await fetchRandomCard("is:commander game:paper");
-    state.results = [card];
+    setSearchResults([card]);
     renderResults();
     await selectSearchCard(card);
     setStatus(`Zufälliger Commander: ${card.name}`, "ok");
@@ -1164,7 +1262,7 @@ async function searchRandomCommander() {
 
   try {
     const card = await fetchRandomCard("is:commander game:paper");
-    state.results = [card];
+    setSearchResults([card]);
     state.searchSelection = null;
     state.searchPrints = [];
     renderResults();
@@ -3262,6 +3360,35 @@ els.toggleSearchBtn.addEventListener("click", () => {
 
 state.deckSearchCollapsed = localStorage.getItem(SEARCH_COLLAPSE_KEY) === "1";
 applySearchCollapse();
+
+// Seitwärts wischen blättert durch die Ergebnisse. Der Bereich wird einmal
+// verdrahtet, nicht bei jedem Zeichnen neu.
+let wischStart = null;
+
+els.results.addEventListener(
+  "touchstart",
+  (event) => {
+    wischStart = event.touches.length === 1
+      ? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+      : null;
+  },
+  { passive: true }
+);
+
+els.results.addEventListener(
+  "touchend",
+  (event) => {
+    if (!wischStart) return;
+    const punkt = event.changedTouches[0];
+    const dx = punkt.clientX - wischStart.x;
+    const dy = punkt.clientY - wischStart.y;
+    wischStart = null;
+    // Deutlich waagrecht und lang genug, sonst würde Scrollen umblättern.
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    gotoSearchPage(state.searchPage + (dx < 0 ? 1 : -1));
+  },
+  { passive: true }
+);
 
 els.openLandsBtn.addEventListener("click", openLandsModal);
 els.landsModalCloseBtn.addEventListener("click", () => closeModal(els.landsModal));

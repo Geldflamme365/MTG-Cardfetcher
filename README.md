@@ -7,6 +7,11 @@ prints of the same card, and keep your own collection.
 Without an account, everything stays in your browser. With an account, your
 collection is saved on Cloudflare, so it is the same on every device.
 
+Search results come in pages of 60 cards. Scryfall hands out at most 175 per
+answer, so the next batch is fetched only when you page past what is loaded —
+one answer covers almost three pages. Use the buttons under the results, or
+swipe sideways on a phone.
+
 The start page has a "Random Commander" button next to "Random Card". It pulls
 a random card that is allowed to lead a deck, planeswalker commanders
 included, and opens it. The search page has the same thing as a suggestion

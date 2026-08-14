@@ -176,6 +176,20 @@ const EN = {
   "Feedback löschen": "Delete feedback",
   "Feedback gelöscht.": "Feedback deleted.",
 
+  // Blättern in den Suchergebnissen
+  "Seite {page} von {pages}": "Page {page} of {pages}",
+  "< Zurück": "< Back",
+  "Weiter >": "Next >",
+  "Auf dem Handy kannst du auch seitwärts wischen.":
+    "On a phone you can also swipe sideways.",
+  "Lade weitere Treffer...": "Loading more results...",
+  "Weitere Treffer konnten nicht geladen werden: {error}":
+    "Could not load more results: {error}",
+  "Seite {page} von {pages}, {count} Treffer insgesamt.":
+    "Page {page} of {pages}, {count} results in total.",
+  "{count} Treffer gefunden, aufgeteilt auf {pages} Seiten.":
+    "{count} results found, spread over {pages} pages.",
+
   // Länder optimieren
   "Länder optimieren": "Optimize lands",
   "länder optimieren": "optimize lands",

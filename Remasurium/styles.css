@@ -553,6 +553,32 @@ input::placeholder {
   object-fit: cover;
 }
 
+/* Blättern durch die Suchergebnisse. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.pager-state {
+  min-width: 140px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.pager button[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pager-hint {
+  margin-top: 6px;
+  text-align: center;
+}
+
 .tile-caption {
   display: block;
   padding: 8px;
