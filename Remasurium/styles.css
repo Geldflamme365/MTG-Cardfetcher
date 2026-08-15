@@ -1518,6 +1518,30 @@ body.is-splitting {
   background: #f4f0e7;
 }
 
+/* Breite Schirme: die 1240 Pixel lassen auf einem Ultrawide zwei Drittel
+   des Bildes leer. Ab hier wird die Fläche genutzt, und die Kartenraster
+   bekommen mehr Spalten statt riesiger Kacheln. */
+@media (min-width: 2000px) {
+  .desk {
+    width: calc(100% - 48px);
+  }
+
+  .search-grid,
+  .collection-grid {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  }
+
+  /* Die Spalte mit Suchfeld und Beispielen darf mitwachsen, den Rest
+     bekommen die Treffer. */
+  .search-layout {
+    grid-template-columns: 400px minmax(0, 1fr);
+  }
+
+  .feature-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 980px) {
   .home-grid,
   .search-layout,
