@@ -726,13 +726,28 @@ input::placeholder {
   margin-top: 8px;
 }
 
+/* Beide Auswertungen nebeneinander und oben bündig. Die Kurve bekommt so
+   nur die halbe Breite, statt sich über das ganze Fenster zu ziehen. */
+.deck-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.deck-stats-cell {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: start;
+}
+
 .mana-curve {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   align-items: end;
-  gap: 8px;
-  height: 96px;
+  gap: 6px;
+  height: 132px;
   margin-top: 10px;
   padding: 6px 8px 0;
   background: linear-gradient(180deg, #ece8de, #d7d2c8);
@@ -759,7 +774,7 @@ input::placeholder {
 /* Der Balken sitzt auf der Grundlinie und wächst nach oben. Schmal, damit
    die Kurve als Form lesbar bleibt und nicht als Klotz. */
 .curve-bar {
-  width: 58%;
+  width: 76%;
   min-height: 2px;
   align-self: end;
   background: linear-gradient(180deg, #6d5bb5, #3d2f78);
@@ -1863,6 +1878,7 @@ body.is-splitting {
   .home-grid,
   .search-layout,
   .deck-layout,
+  .deck-stats-grid,
   .details-grid {
     grid-template-columns: 1fr;
   }
