@@ -564,9 +564,9 @@ input::placeholder {
   grid-auto-columns: minmax(0, 1fr);
   align-items: end;
   gap: 8px;
-  height: 180px;
+  height: 96px;
   margin-top: 10px;
-  padding: 8px 8px 0;
+  padding: 6px 8px 0;
   background: linear-gradient(180deg, #ece8de, #d7d2c8);
   border: 2px solid;
   border-color: #8d887e var(--edge-light) var(--edge-light) #8d887e;
@@ -582,14 +582,16 @@ input::placeholder {
 }
 
 .curve-count {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-/* Der Balken sitzt auf der Grundlinie und wächst nach oben. */
+/* Der Balken sitzt auf der Grundlinie und wächst nach oben. Schmal, damit
+   die Kurve als Form lesbar bleibt und nicht als Klotz. */
 .curve-bar {
-  width: 100%;
+  width: 58%;
   min-height: 2px;
   align-self: end;
   background: linear-gradient(180deg, #6d5bb5, #3d2f78);
@@ -601,48 +603,60 @@ input::placeholder {
   border-top: 2px solid #8d887e;
   width: 100%;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
 .mana-colors {
-  display: grid;
-  gap: 6px;
   margin-top: 10px;
 }
 
-.color-row {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr) 48px;
-  gap: 10px;
-  align-items: center;
-  font-size: 0.9rem;
-}
-
-.color-track {
-  height: 20px;
-  background: #ece8de;
+/* Eine durchgehende Säule, je Farbe ein Abschnitt nach Anteil. */
+.color-bar {
+  display: flex;
+  height: 26px;
+  overflow: hidden;
   border: 2px solid;
   border-color: #8d887e var(--edge-light) var(--edge-light) #8d887e;
 }
 
-.color-fill {
-  display: block;
-  height: 100%;
+.color-seg {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 0.8rem;
+  font-family: "Courier New", Courier, monospace;
 }
 
-.color-share {
-  text-align: right;
-  font-weight: 700;
+.color-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
 
+.color-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #4b473f;
+}
+
 /* Die fünf Farben von Magic, gedämpft genug für den hellen Rahmen. */
-.color-fill.is-w { background: #e8dcae; }
-.color-fill.is-u { background: #4a86c4; }
-.color-fill.is-b { background: #4a4453; }
-.color-fill.is-r { background: #c8543f; }
-.color-fill.is-g { background: #4f9160; }
+.is-w { background: #e8dcae; color: #2b2617; }
+.is-u { background: #4a86c4; color: #06121f; }
+.is-b { background: #4a4453; color: #ded9e6; }
+.is-r { background: #c8543f; color: #200804; }
+.is-g { background: #4f9160; color: #06170c; }
 
 /* Preise: in der Suche und in der Versionsliste unter dem Namen. */
 .tile-price {

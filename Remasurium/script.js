@@ -2778,20 +2778,39 @@ function renderDeckStats() {
     return;
   }
 
-  els.manaColors.innerHTML = BASIC_LANDS.filter((eintrag) => farben[eintrag.farbe] > 0)
-    .map((eintrag) => {
-      const anteil = (farben[eintrag.farbe] / gesamtPips) * 100;
-      return `
-        <div class="color-row">
-          <span class="color-name">${escapeHtml(t(eintrag.label))}</span>
-          <span class="color-track">
-            <span class="color-fill is-${eintrag.farbe.toLowerCase()}" style="width: ${anteil.toFixed(1)}%"></span>
-          </span>
-          <span class="color-share">${Math.round(anteil)}%</span>
-        </div>
-      `;
-    })
-    .join("");
+  // Ein durchgehender Balken, je Farbe ein Abschnitt nach Anteil.
+  const vertreten = BASIC_LANDS.filter((eintrag) => farben[eintrag.farbe] > 0).map((eintrag) => ({
+    ...eintrag,
+    anteil: (farben[eintrag.farbe] / gesamtPips) * 100
+  }));
+
+  els.manaColors.innerHTML = `
+    <div class="color-bar">
+      ${vertreten
+        .map(
+          (eintrag) => `
+            <span
+              class="color-seg is-${eintrag.farbe.toLowerCase()}"
+              style="width: ${eintrag.anteil.toFixed(2)}%"
+              title="${escapeHtml(t(eintrag.label))} ${Math.round(eintrag.anteil)}%"
+            >${eintrag.farbe}</span>
+          `
+        )
+        .join("")}
+    </div>
+    <div class="color-legend">
+      ${vertreten
+        .map(
+          (eintrag) => `
+            <span class="color-key">
+              <span class="color-dot is-${eintrag.farbe.toLowerCase()}"></span>
+              ${escapeHtml(t(eintrag.label))} ${Math.round(eintrag.anteil)}%
+            </span>
+          `
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function renderDeckEditor() {
