@@ -116,6 +116,22 @@ const els = {
   toggleSearchBtn: document.getElementById("toggleSearchBtn"),
   legalityBadge: document.getElementById("legalityBadge"),
   deckStatsSummary: document.getElementById("deckStatsSummary"),
+  openPlaytestBtn: document.getElementById("openPlaytestBtn"),
+  playtestModal: document.getElementById("playtestModal"),
+  playtestCloseBtn: document.getElementById("playtestCloseBtn"),
+  playtestTitle: document.getElementById("playtestTitle"),
+  playtestBoard: document.getElementById("playtestBoard"),
+  playtestHint: document.getElementById("playtestHint"),
+  playtestHand: document.getElementById("playtestHand"),
+  playtestLibrary: document.getElementById("playtestLibrary"),
+  playtestCommander: document.getElementById("playtestCommander"),
+  playtestTurn: document.getElementById("playtestTurn"),
+  playtestLibCount: document.getElementById("playtestLibCount"),
+  playtestHandCount: document.getElementById("playtestHandCount"),
+  playtestBoardCount: document.getElementById("playtestBoardCount"),
+  playtestDrawBtn: document.getElementById("playtestDrawBtn"),
+  playtestTurnBtn: document.getElementById("playtestTurnBtn"),
+  playtestResetBtn: document.getElementById("playtestResetBtn"),
   manaCurve: document.getElementById("manaCurve"),
   manaColors: document.getElementById("manaColors"),
   openLandsBtn: document.getElementById("openLandsBtn"),
@@ -2708,6 +2724,277 @@ async function applyLands() {
   }
 }
 
+// --- Playtester -----------------------------------------------------------
+// Ein Deck einmal von Hand durchspielen: ziehen, ablegen, tappen, Zug für
+// Zug. Nichts davon wird gespeichert, beim Schliessen ist es vorbei.
+
+const START_HAND = 7;
+
+const playtest = {
+  library: [],
+  hand: [],
+  board: [],
+  commander: null,
+  turn: 1,
+  laeuft: false
+};
+
+// Jedes Exemplar einer Karte wird ein eigenes Stück mit eigener Nummer,
+// sonst liessen sich vier Wälder nicht auseinanderhalten.
+function playtestStapel() {
+  const stuecke = [];
+  for (const karte of state.activeDeckCards) {
+    for (let i = 0; i < karte.quantity; i++) {
+      stuecke.push({
+        uid: `${karte.id}#${i}`,
+        id: karte.id,
+        name: karte.name,
+        image: karte.image
+      });
+    }
+  }
+  return stuecke;
+}
+
+// Fisher-Yates: jede Reihenfolge gleich wahrscheinlich.
+function mischen(liste) {
+  const kopie = [...liste];
+  for (let i = kopie.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [kopie[i], kopie[j]] = [kopie[j], kopie[i]];
+  }
+  return kopie;
+}
+
+function playtestNeu() {
+  const commander = state.activeDeck?.commander;
+  playtest.library = mischen(playtestStapel());
+  playtest.hand = playtest.library.splice(0, START_HAND);
+  playtest.board = [];
+  playtest.commander = commander
+    ? { uid: `cmd#${commander.id}`, id: commander.id, name: commander.name, image: commander.image }
+    : null;
+  playtest.turn = 1;
+  playtest.laeuft = true;
+  renderPlaytest();
+  setPlaytestHinweis(t("Neues Spiel, {count} Karten auf der Hand.", { count: playtest.hand.length }));
+}
+
+function playtestZiehen(anzahl = 1) {
+  let gezogen = 0;
+  for (let i = 0; i < anzahl && playtest.library.length; i++) {
+    playtest.hand.push(playtest.library.shift());
+    gezogen += 1;
+  }
+  renderPlaytest();
+  setPlaytestHinweis(
+    gezogen ? t("{count} Karte gezogen.", { count: gezogen }) : t("Die Bibliothek ist leer.")
+  );
+}
+
+function playtestNeuerZug() {
+  playtest.turn += 1;
+  // Zugbeginn: alles enttappen, dann ziehen.
+  for (const stueck of playtest.board) {
+    stueck.tapped = false;
+  }
+  playtestZiehen(1);
+  setPlaytestHinweis(t("Zug {turn}.", { turn: playtest.turn }));
+}
+
+function playtestKartenBild(stueck, klassen = "") {
+  return `
+    <div class="playtest-card ${klassen}" data-uid="${escapeHtml(stueck.uid)}" title="${escapeHtml(stueck.name)}">
+      ${
+        stueck.image
+          ? `<img src="${escapeHtml(stueck.image)}" alt="${escapeHtml(stueck.name)}" draggable="false" />`
+          : `<span class="playtest-card-name">${escapeHtml(stueck.name)}</span>`
+      }
+    </div>
+  `;
+}
+
+function renderPlaytest() {
+  els.playtestTurn.textContent = playtest.turn;
+  els.playtestLibCount.textContent = playtest.library.length;
+  els.playtestHandCount.textContent = playtest.hand.length;
+  els.playtestBoardCount.textContent = playtest.board.length;
+
+  els.playtestHand.innerHTML = playtest.hand
+    .map((stueck) => playtestKartenBild(stueck, "is-hand"))
+    .join("");
+
+  // Die Bibliothek zeigt eine Rückseite, solange etwas drin ist.
+  els.playtestLibrary.innerHTML = `
+    <span class="playtest-zone-title">${escapeHtml(t("Bibliothek"))} (${playtest.library.length})</span>
+    ${
+      playtest.library.length
+        ? `<div class="playtest-card is-back" data-draw="1" title="${escapeHtml(t("Klick zieht, Ziehen legt direkt ins Spiel"))}"><span>MTG</span></div>`
+        : `<div class="playtest-empty">${escapeHtml(t("leer"))}</div>`
+    }
+  `;
+
+  els.playtestCommander.innerHTML = `
+    <span class="playtest-zone-title">${escapeHtml(t("Commander"))}</span>
+    ${
+      playtest.commander
+        ? playtestKartenBild(playtest.commander, "is-commander")
+        : `<div class="playtest-empty">${escapeHtml(t("keiner"))}</div>`
+    }
+  `;
+
+  for (const alt of els.playtestBoard.querySelectorAll(".playtest-card.is-board")) {
+    alt.remove();
+  }
+  for (const stueck of playtest.board) {
+    els.playtestBoard.insertAdjacentHTML(
+      "beforeend",
+      `<div class="playtest-card is-board${stueck.tapped ? " is-tapped" : ""}" data-uid="${escapeHtml(
+        stueck.uid
+      )}" style="left: ${stueck.x}px; top: ${stueck.y}px" title="${escapeHtml(stueck.name)}">
+        ${
+          stueck.image
+            ? `<img src="${escapeHtml(stueck.image)}" alt="${escapeHtml(stueck.name)}" draggable="false" />`
+            : `<span class="playtest-card-name">${escapeHtml(stueck.name)}</span>`
+        }
+      </div>`
+    );
+  }
+
+  els.playtestHint.hidden = playtest.board.length > 0;
+}
+
+function setPlaytestHinweis(text) {
+  els.playtestTitle.textContent = `playtest — ${state.activeDeck?.name || ""} — ${text}`;
+}
+
+// Ein Stück aus seiner bisherigen Zone nehmen.
+function playtestEntnehmen(uid) {
+  const ausHand = playtest.hand.findIndex((stueck) => stueck.uid === uid);
+  if (ausHand >= 0) {
+    return playtest.hand.splice(ausHand, 1)[0];
+  }
+  const ausBoard = playtest.board.findIndex((stueck) => stueck.uid === uid);
+  if (ausBoard >= 0) {
+    return playtest.board.splice(ausBoard, 1)[0];
+  }
+  if (playtest.commander && playtest.commander.uid === uid) {
+    const stueck = playtest.commander;
+    playtest.commander = null;
+    return stueck;
+  }
+  return null;
+}
+
+// Ziehen mit dem Zeiger: ein Schatten folgt dem Finger, beim Loslassen
+// entscheidet die Stelle darunter, wohin die Karte kommt.
+let zug = null;
+
+function playtestZeigerStart(event) {
+  const karte = event.target.closest(".playtest-card");
+  if (!karte || !els.playtestModal.contains(karte)) {
+    return;
+  }
+
+  const rect = karte.getBoundingClientRect();
+  zug = {
+    uid: karte.dataset.uid || null,
+    ausBibliothek: karte.dataset.draw === "1",
+    startX: event.clientX,
+    startY: event.clientY,
+    griffX: event.clientX - rect.left,
+    griffY: event.clientY - rect.top,
+    bewegt: false,
+    schatten: null,
+    quelle: karte
+  };
+  // Nur eine Bequemlichkeit: ohne Zeigerfang läuft das Ziehen über die
+  // Ereignisse am Fenster weiter. Schlägt es fehl, darf es nicht den
+  // ganzen Griff abbrechen.
+  try {
+    karte.setPointerCapture?.(event.pointerId);
+  } catch {
+    // egal
+  }
+}
+
+function playtestZeigerBewegung(event) {
+  if (!zug) return;
+  const weit = Math.abs(event.clientX - zug.startX) + Math.abs(event.clientY - zug.startY);
+  if (!zug.bewegt && weit < 6) {
+    return;
+  }
+  if (!zug.bewegt) {
+    zug.bewegt = true;
+    zug.schatten = zug.quelle.cloneNode(true);
+    zug.schatten.classList.add("is-dragging");
+    zug.schatten.classList.remove("is-tapped");
+    document.body.appendChild(zug.schatten);
+  }
+  zug.schatten.style.left = `${event.clientX - zug.griffX}px`;
+  zug.schatten.style.top = `${event.clientY - zug.griffY}px`;
+}
+
+function playtestZeigerEnde(event) {
+  if (!zug) return;
+  const { uid, ausBibliothek, bewegt, schatten, griffX, griffY } = zug;
+  zug = null;
+  schatten?.remove();
+
+  // Klick ohne Bewegung: aus der Bibliothek ziehen, sonst tappen.
+  if (!bewegt) {
+    if (ausBibliothek) {
+      playtestZiehen(1);
+      return;
+    }
+    const stueck = playtest.board.find((eintrag) => eintrag.uid === uid);
+    if (stueck) {
+      stueck.tapped = !stueck.tapped;
+      renderPlaytest();
+    }
+    return;
+  }
+
+  const brett = els.playtestBoard.getBoundingClientRect();
+  const imBrett =
+    event.clientX >= brett.left &&
+    event.clientX <= brett.right &&
+    event.clientY >= brett.top &&
+    event.clientY <= brett.bottom;
+
+  if (!imBrett) {
+    renderPlaytest();
+    return;
+  }
+
+  const stueck = ausBibliothek ? playtest.library.shift() : playtestEntnehmen(uid);
+  if (!stueck) {
+    renderPlaytest();
+    return;
+  }
+
+  stueck.x = Math.round(event.clientX - brett.left - griffX);
+  stueck.y = Math.round(event.clientY - brett.top - griffY);
+  stueck.tapped = stueck.tapped || false;
+  playtest.board.push(stueck);
+  renderPlaytest();
+}
+
+function openPlaytest() {
+  if (!state.activeDeck) return;
+  if (!state.activeDeckCards.length) {
+    setDeckStatus(t("Das Deck hat keine Karten zum Spielen."), "err");
+    return;
+  }
+  playtestNeu();
+  openModal(els.playtestModal);
+}
+
+function closePlaytest() {
+  playtest.laeuft = false;
+  closeModal(els.playtestModal);
+}
+
 // --- Statistik ------------------------------------------------------------
 
 // Die Kurve endet bei 8, alles darüber landet im letzten Balken.
@@ -3770,6 +4057,46 @@ bindeWischen(els.deckSearchResults, (richtung) =>
   gotoDeckSearchPage(state.deckSearchPage + richtung)
 );
 
+els.openPlaytestBtn.addEventListener("click", openPlaytest);
+els.playtestCloseBtn.addEventListener("click", closePlaytest);
+els.playtestDrawBtn.addEventListener("click", () => playtestZiehen(1));
+els.playtestTurnBtn.addEventListener("click", playtestNeuerZug);
+els.playtestResetBtn.addEventListener("click", playtestNeu);
+
+els.playtestModal.addEventListener("pointerdown", playtestZeigerStart);
+window.addEventListener("pointermove", playtestZeigerBewegung);
+window.addEventListener("pointerup", playtestZeigerEnde);
+window.addEventListener("pointercancel", () => {
+  zug?.schatten?.remove();
+  zug = null;
+});
+
+// Tastenkürzel gelten nur, solange der Playtester offen ist und man nicht
+// gerade in einem Feld tippt.
+window.addEventListener("keydown", (event) => {
+  if (!playtest.laeuft || els.playtestModal.getAttribute("aria-hidden") === "true") {
+    return;
+  }
+  if (/^(input|textarea|select)$/i.test(event.target.tagName)) {
+    return;
+  }
+
+  const taste = event.key.toLowerCase();
+  if (taste === "d" && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    playtestZiehen(1);
+  } else if (taste === "n" && (event.ctrlKey || event.metaKey || event.shiftKey)) {
+    // Strg+N fangen die meisten Browser selbst ab, Umschalt+N geht immer.
+    event.preventDefault();
+    playtestNeu();
+  } else if (taste === "n") {
+    event.preventDefault();
+    playtestNeuerZug();
+  } else if (event.key === "Escape") {
+    closePlaytest();
+  }
+});
+
 els.openLandsBtn.addEventListener("click", openLandsModal);
 els.landsModalCloseBtn.addEventListener("click", () => closeModal(els.landsModal));
 els.landsApplyBtn.addEventListener("click", applyLands);
@@ -3819,6 +4146,11 @@ function rerenderDynamicText() {
   // Der Titel des Einklapp-Knopfs hängt am Zustand, nicht am Quelltext:
   // die Übersetzung würde sonst den ursprünglichen Text zurücksetzen.
   applySearchCollapse();
+  // Der Playtester zeichnet seine Zonen selbst, der allgemeine Durchlauf
+  // erwischt sie nicht.
+  if (playtest.laeuft) {
+    renderPlaytest();
+  }
   if (state.activeDeck) {
     renderDeckEditor();
   }

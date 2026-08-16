@@ -176,6 +176,28 @@ const EN = {
   "Feedback löschen": "Delete feedback",
   "Feedback gelöscht.": "Feedback deleted.",
 
+  // Playtester
+  "▶ Playtest": "▶ Playtest",
+  "Karten aus Hand oder Bibliothek hierher ziehen. Klick tappt und enttappt.":
+    "Drag cards here from your hand or library. A click taps and untaps.",
+  "Bibliothek": "Library",
+  "Commander": "Commander",
+  "keiner": "none",
+  "leer": "empty",
+  "Klick zieht, Ziehen legt direkt ins Spiel":
+    "Click draws, dragging puts it straight into play",
+  "Ziehen (D)": "Draw (D)",
+  "Neuer Zug (N)": "New turn (N)",
+  "Neues Spiel (Shift+N)": "New game (Shift+N)",
+  "Zug": "Turn",
+  "Hand": "Hand",
+  "Im Spiel": "In play",
+  "Neues Spiel, {count} Karten auf der Hand.": "New game, {count} cards in hand.",
+  "{count} Karte gezogen.": "Drew {count} card(s).",
+  "Die Bibliothek ist leer.": "The library is empty.",
+  "Zug {turn}.": "Turn {turn}.",
+  "Das Deck hat keine Karten zum Spielen.": "The deck has no cards to play with.",
+
   // Statistik
   "statistik": "statistics",
   "Manakurve": "Mana curve",

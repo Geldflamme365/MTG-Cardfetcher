@@ -553,6 +553,174 @@ input::placeholder {
   object-fit: cover;
 }
 
+/* Playtester: ein Fenster über die ganze Fläche. */
+.modal-full {
+  display: flex;
+  flex-direction: column;
+  width: min(1600px, calc(100vw - 24px));
+  height: calc(100vh - 24px);
+  max-width: none;
+}
+
+.playtest-board {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(45deg, #17102c 0 12px, #140e26 12px 24px);
+  border-bottom: 2px solid #0f071f;
+  touch-action: none;
+}
+
+.playtest-hint {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #b6a9dd;
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+/* Commander und Bibliothek liegen unten rechts und sind gleich gross. */
+.playtest-zones {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.playtest-zone {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 4px;
+  width: 132px;
+  padding: 6px;
+  background: rgba(8, 5, 18, 0.75);
+  border: 2px solid #6b5fa6;
+}
+
+.playtest-zone-title {
+  color: #d3c9f2;
+  font-size: 0.72rem;
+  font-family: "Courier New", Courier, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.playtest-empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 63 / 88;
+  color: #7b70a3;
+  border: 1px dashed #6b5fa6;
+  font-size: 0.8rem;
+}
+
+.playtest-card {
+  width: 118px;
+  aspect-ratio: 63 / 88;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.playtest-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.playtest-card-name {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 4px;
+  color: #e6dfff;
+  background: #241a4d;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 0.72rem;
+}
+
+.playtest-card.is-back {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  color: #f0e8ff;
+  background: linear-gradient(160deg, #4b3a8f, #221545);
+  border: 2px solid #8f7fd0;
+  border-radius: 4px;
+  font-family: "Courier New", Courier, monospace;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.playtest-card.is-commander,
+.playtest-zone .playtest-card {
+  width: 100%;
+}
+
+/* Auf dem Spielfeld liegen die Karten frei, getappt um 90 Grad gedreht. */
+.playtest-card.is-board {
+  position: absolute;
+  transition: transform 140ms ease;
+}
+
+.playtest-card.is-board.is-tapped {
+  transform: rotate(90deg);
+}
+
+.playtest-card.is-dragging {
+  position: fixed;
+  z-index: 60;
+  opacity: 0.85;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+}
+
+.playtest-hand {
+  display: flex;
+  gap: 8px;
+  min-height: 176px;
+  padding: 10px;
+  overflow-x: auto;
+  background: linear-gradient(180deg, #ece8de, #d7d2c8);
+  border-bottom: 2px solid #8d887e;
+}
+
+.playtest-hand .playtest-card {
+  flex: 0 0 auto;
+}
+
+.playtest-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 8px 12px;
+  background: var(--window-2);
+}
+
+/* Beschriftung und Zahl je in einem eigenen Element: die Übersetzung
+   ersetzt sonst den Text samt seinem Leerzeichen. */
+.playtest-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.playtest-bar .button-row {
+  margin-left: auto;
+}
+
 /* Statistik unter dem Deck: Manakurve und Farbverteilung. */
 .deck-stats-panel {
   margin-top: 8px;

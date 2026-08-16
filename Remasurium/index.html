@@ -282,6 +282,7 @@
                 <button id="deleteDeckBtn" type="button" class="retro-button">Deck löschen</button>
                 <button id="legalityBadge" type="button" class="legality-badge" title="Regelprüfung anzeigen">wird geprüft</button>
                 <button id="openLandsBtn" type="button" class="retro-button">Länder optimieren</button>
+                <button id="openPlaytestBtn" type="button" class="retro-button">&#9654; Playtest</button>
               </div>
 
               <label class="field-label" for="deckNameInput">Deckname</label>
@@ -531,6 +532,43 @@
           <h2 class="admin-heading">Alle Feedbacks</h2>
           <p class="small-note">Nur für das Adminkonto sichtbar.</p>
           <div id="reviewList" class="review-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="playtestModal" class="modal" aria-hidden="true">
+    <div class="modal-dialog window modal-full" role="dialog" aria-modal="true" aria-label="Playtest">
+      <div class="title-bar">
+        <span id="playtestTitle">playtest</span>
+        <button id="playtestCloseBtn" class="modal-close" type="button" aria-label="Schließen">X</button>
+      </div>
+
+      <div class="playtest-board" id="playtestBoard">
+        <div class="playtest-hint" id="playtestHint">
+          Karten aus Hand oder Bibliothek hierher ziehen. Klick tappt und enttappt.
+        </div>
+        <div class="playtest-zones">
+          <div class="playtest-zone" id="playtestCommander" data-zone="commander">
+            <span class="playtest-zone-title">Commander</span>
+          </div>
+          <div class="playtest-zone" id="playtestLibrary" data-zone="library">
+            <span class="playtest-zone-title">Bibliothek</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="playtest-hand" id="playtestHand"></div>
+
+      <div class="playtest-bar">
+        <span class="playtest-stat"><span>Zug</span><strong id="playtestTurn">1</strong></span>
+        <span class="playtest-stat"><span>Bibliothek</span><strong id="playtestLibCount">0</strong></span>
+        <span class="playtest-stat"><span>Hand</span><strong id="playtestHandCount">0</strong></span>
+        <span class="playtest-stat"><span>Im Spiel</span><strong id="playtestBoardCount">0</strong></span>
+        <div class="button-row">
+          <button id="playtestDrawBtn" type="button" class="retro-button">Ziehen (D)</button>
+          <button id="playtestTurnBtn" type="button" class="retro-button">Neuer Zug (N)</button>
+          <button id="playtestResetBtn" type="button" class="retro-button">Neues Spiel (Shift+N)</button>
         </div>
       </div>
     </div>

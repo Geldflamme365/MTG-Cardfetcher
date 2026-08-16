@@ -215,6 +215,27 @@ without editing. While reading a list:
 Export writes the commander first, so an exported deck can be read back in
 unchanged.
 
+### Playtester
+
+"▶ Playtest" next to the rules check opens the deck as a game. The library is
+shuffled fresh, seven cards go to the hand, and the commander sits in its own
+zone next to the library, the same size.
+
+Drag a card from your hand or straight off the library onto the table and drop
+it where you want it. A click on a card in play taps it, turning it 90 degrees;
+another click turns it back. Clicking the library draws to your hand.
+
+| Key | What it does |
+| --- | --- |
+| `D` | Draw a card |
+| `N` | New turn: untap everything, draw, turn counter up |
+| `Shift+N` | New game, shuffled again |
+| `Esc` | Close |
+
+Browsers keep `Ctrl+N` for themselves and hand it to the window, not the page,
+so `Shift+N` starts a new game instead. The buttons in the bottom bar do the
+same thing. Nothing here is saved; closing the window ends the game.
+
 ### Statistics
 
 Under the deck sits a statistics panel. On top the mana curve: how many cards
