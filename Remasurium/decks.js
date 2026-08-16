@@ -33,6 +33,8 @@ function publicDeck(deck) {
     commander: deck.commander || null,
     // Der Commander zählt als Karte des Decks mit.
     cardCount: countCards(deck.cards) + (deck.commander ? 1 : 0),
+    // Nur Id und Menge: mehr braucht die Übersicht für den Preis nicht.
+    cards: (deck.cards || []).map((card) => ({ id: card.id, quantity: card.quantity })),
     createdAt: deck.createdAt,
     updatedAt: deck.updatedAt
   };

@@ -553,6 +553,50 @@ input::placeholder {
   object-fit: cover;
 }
 
+/* Preise: in der Suche und in der Versionsliste unter dem Namen. */
+.tile-price {
+  display: block;
+  margin-top: 2px;
+  color: #2f5d34;
+  font-weight: 700;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-price.is-unknown,
+.deck-card-price.is-unknown {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.deck-card-price {
+  display: block;
+  color: #2f5d34;
+  font-weight: 700;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* In der Stapelansicht liegt der Preis auf der Karte und wird erst beim
+   Überfahren sichtbar: darunter steckt sonst die nächste Karte. */
+.deck-card-tile .deck-card-price {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 3px 6px;
+  color: #d8ffdc;
+  background: rgba(12, 8, 24, 0.82);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.deck-card-tile:hover .deck-card-price,
+.deck-card-tile:focus-within .deck-card-price {
+  opacity: 1;
+}
+
 /* Blättern durch die Suchergebnisse. */
 .pager {
   display: flex;

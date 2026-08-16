@@ -176,6 +176,12 @@ const EN = {
   "Feedback löschen": "Delete feedback",
   "Feedback gelöscht.": "Feedback deleted.",
 
+  // Preise
+  "kein Preis": "no price",
+  "{price} (+{count} ohne Preis)": "{price} (+{count} without a price)",
+  "Preise von Cardmarket über Scryfall, in Franken zum Tageskurs der EZB.":
+    "Prices from Cardmarket via Scryfall, in francs at the ECB daily rate.",
+
   // Blättern in den Suchergebnissen
   "Seite {page} von {pages}": "Page {page} of {pages}",
   "< Zurück": "< Back",

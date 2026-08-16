@@ -215,6 +215,19 @@ without editing. While reading a list:
 Export writes the commander first, so an exported deck can be read back in
 unchanged.
 
+### Prices
+
+Cards carry a price: under every hit in the search, under every printing in the
+version list, and in the deck editor on the card you point at. Each card type
+group shows the sum of its cards, and the whole deck is priced in the editor
+header and on its tile in the overview. The commander counts in both.
+
+The numbers come from Cardmarket. Scryfall passes their EUR prices through
+along with the rest of a card, so the price rides on a request the app makes
+anyway. Francs are converted at the European Central Bank daily reference rate,
+fetched once a day. If a card has no price on Cardmarket, it is named as such
+and left out of the sums rather than counted as zero.
+
 ### Optimize lands
 
 "Optimize lands" at the right end of the toolbar opens a window that fills the

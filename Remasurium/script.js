@@ -750,7 +750,10 @@ function renderResults() {
                     : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
                 }
               </span>
-              <span class="tile-caption">${escapeHtml(card.name)}</span>
+              <span class="tile-caption">
+                ${escapeHtml(card.name)}
+                ${preisSpanne(card)}
+              </span>
             </button>
           `;
         })
@@ -1065,6 +1068,7 @@ function renderVersionModal() {
           <span class="tile-caption">
             ${escapeHtml(print.set_name || "Unbekanntes Set")}
             <small>${escapeHtml(print.collector_number || "?")} - ${escapeHtml(print.released_at || "?")}</small>
+            ${preisSpanne(print)}
           </span>
         </button>
       `;
@@ -1502,9 +1506,16 @@ function renderDeckList() {
 
   els.deckList.innerHTML = decks
     .map((deck) => {
+      // Der Commander zählt beim Preis mit wie bei der Kartenzahl.
+      const preis = preisSumme([
+        ...(deck.cards || []),
+        ...(deck.commander ? [{ id: deck.commander.id, quantity: 1 }] : [])
+      ]);
       const info = `${t(deck.cardCount === 1 ? "{count} Karte" : "{count} Karten", {
         count: deck.cardCount
-      })}${deck.commander ? ` · ${escapeHtml(deck.commander.name)}` : ""}`;
+      })} · ${escapeHtml(preisText(preis))}${
+        deck.commander ? ` · ${escapeHtml(deck.commander.name)}` : ""
+      }`;
 
       // Beim Umbenennen tritt an die Stelle des Namens ein Eingabefeld.
       // Der Öffnen-Knopf entfällt so lange, damit ein Klick ins Feld
@@ -1609,8 +1620,27 @@ async function refreshDecks() {
   try {
     state.decks = await deckStore.list();
     renderDeckList();
+    ladeDeckPreise();
   } catch (error) {
     setDeckStatus(`Decks konnten nicht geladen werden: ${error.message}`, "err");
+  }
+}
+
+// Die Übersicht steht sofort, die Preise kommen nach. Beim ersten Mal
+// kostet das ein paar Abfragen, danach liegt alles im Cache.
+async function ladeDeckPreise() {
+  const ids = state.decks.flatMap((deck) => [
+    ...(deck.cards || []).map((karte) => karte.id),
+    ...(deck.commander ? [deck.commander.id] : [])
+  ]);
+  if (!ids.length) {
+    return;
+  }
+  try {
+    await ensureLegality(ids);
+    renderDeckList();
+  } catch {
+    // Ohne Scryfall bleibt die Übersicht ohne Preise, sonst unverändert.
   }
 }
 
@@ -1814,9 +1844,13 @@ function renderDeckCards() {
   const cards = state.activeDeckCards;
   const singleton = (state.activeDeck?.format || "commander") === "commander";
   // Der Commander zählt als Karte des Decks mit.
-  const total =
-    cards.reduce((sum, card) => sum + card.quantity, 0) + (state.activeDeck?.commander ? 1 : 0);
-  els.deckTotal.textContent = t(total === 1 ? "{count} Karte" : "{count} Karten", { count: total });
+  const commander = state.activeDeck?.commander;
+  const total = cards.reduce((sum, card) => sum + card.quantity, 0) + (commander ? 1 : 0);
+  // Der Commander zählt auch beim Preis mit.
+  const preis = preisSumme([...cards, ...(commander ? [{ id: commander.id, quantity: 1 }] : [])]);
+  els.deckTotal.textContent = `${t(total === 1 ? "{count} Karte" : "{count} Karten", {
+    count: total
+  })} · ${preisText(preis)}`;
 
   if (!cards.length) {
     els.deckCards.innerHTML = `<div class="empty-state">Noch keine Karten. Such links eine oder nutze Quick Add.</div>`;
@@ -1846,12 +1880,26 @@ function renderDeckCards() {
   // Karten, an denen die Regelprüfung hängt, bekommen einen roten Rand.
   const rot = (card) => (state.deckProblemCards.has(card.id) ? " is-illegal" : "");
 
+  // Preis der Karte, bei mehreren Exemplaren die Summe.
+  const preisZeile = (card) => {
+    const preis = kartenPreis(card.id);
+    if (preis === null) {
+      return `<span class="deck-card-price is-unknown">${escapeHtml(t("kein Preis"))}</span>`;
+    }
+    const gesamt = preis * card.quantity;
+    const text = card.quantity > 1
+      ? `${formatPreis(gesamt)} (${card.quantity} x ${formatPreis(preis)})`
+      : formatPreis(gesamt);
+    return `<span class="deck-card-price">${escapeHtml(text)}</span>`;
+  };
+
   const zeile = (card) => `
     <div class="deck-card-row${rot(card)}">
       ${bild(card)}
       <span class="deck-card-name">
         <strong>${escapeHtml(card.name)}</strong>
         <span>${escapeHtml(card.set_name || "?")}</span>
+        ${preisZeile(card)}
       </span>
       <span class="deck-card-actions">${aktionen(card)}</span>
     </div>
@@ -1865,6 +1913,7 @@ function renderDeckCards() {
       ${bild(card)}
       ${card.quantity > 1 ? `<span class="deck-tile-count">${card.quantity}×</span>` : ""}
       <span class="deck-card-actions deck-tile-actions">${aktionen(card)}</span>
+      ${preisZeile(card)}
     </div>
   `;
 
@@ -1877,7 +1926,7 @@ function renderDeckCards() {
         <div class="deck-group">
           <h3 class="deck-group-head">
             ${escapeHtml(t(gruppe.label))}
-            <span>${gruppe.count}</span>
+            <span>${gruppe.count} &middot; ${escapeHtml(preisText(preisSumme(gruppe.cards)))}</span>
           </h3>
           <div class="${eingeklappt ? "deck-group-stack" : "deck-group-list"}">
             ${gruppe.cards.map(eingeklappt ? kachel : zeile).join("")}
@@ -2068,6 +2117,107 @@ const legalityCache = {
 const CARD_INFO_KEY = "remasurium.cardInfo";
 const CARD_INFO_TTL = 30 * 24 * 60 * 60 * 1000;
 const CARD_INFO_MAX = 4000;
+// Preise sind das Einzige, was sich täglich ändert. Sie bekommen deshalb
+// eine eigene, kurze Haltbarkeit und einen eigenen Zeitstempel.
+const PRICE_TTL = 24 * 60 * 60 * 1000;
+
+function preisVeraltet(id) {
+  const eintrag = cardInfoCache.get(id);
+  return !eintrag || !eintrag.pt || Date.now() - eintrag.pt > PRICE_TTL;
+}
+
+// Cardmarket-Preis in Euro. Scryfall bezieht die eur-Preise von dort.
+function kartenPreis(id) {
+  const eintrag = cardInfoCache.get(id);
+  const roh = eintrag?.price;
+  const zahl = Number(roh);
+  return roh != null && Number.isFinite(zahl) ? zahl : null;
+}
+
+function preisAusScryfall(card) {
+  const roh = card?.prices?.eur ?? card?.prices?.eur_foil ?? null;
+  const zahl = Number(roh);
+  return roh != null && Number.isFinite(zahl) ? zahl : null;
+}
+
+// Cardmarket rechnet in Euro, angezeigt wird in Franken. Der Kurs kommt
+// von den Referenzkursen der EZB, einmal am Tag.
+const RATE_KEY = "remasurium.chfRate";
+const RATE_TTL = 24 * 60 * 60 * 1000;
+const RATE_URL = "https://api.frankfurter.dev/v1/latest?base=EUR&symbols=CHF";
+
+let kurs = null;
+
+function ladeKursAusAblage() {
+  try {
+    const roh = JSON.parse(localStorage.getItem(RATE_KEY) || "null");
+    if (roh && Number.isFinite(Number(roh.rate))) {
+      kurs = { rate: Number(roh.rate), date: roh.date, t: roh.t || 0 };
+    }
+  } catch {
+    kurs = null;
+  }
+}
+
+async function ensureKurs() {
+  if (kurs && Date.now() - kurs.t < RATE_TTL) {
+    return;
+  }
+  try {
+    const response = await fetch(RATE_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const rate = Number(data?.rates?.CHF);
+    if (!Number.isFinite(rate)) throw new Error("kein Kurs");
+    kurs = { rate, date: data.date, t: Date.now() };
+    localStorage.setItem(RATE_KEY, JSON.stringify(kurs));
+  } catch {
+    // Ohne frischen Kurs wird der zuletzt bekannte weiterverwendet. Gibt
+    // es gar keinen, bleiben die Preise in Euro stehen: lieber eine
+    // andere Währung als gar kein Preis.
+  }
+}
+
+function formatPreis(betragEur) {
+  if (!kurs) {
+    return `${betragEur.toFixed(2)} €`;
+  }
+  return `${(betragEur * kurs.rate).toFixed(2)} CHF`;
+}
+
+ladeKursAusAblage();
+ensureKurs();
+
+// Summe über Karten mit Menge. Gibt zusätzlich zurück, wie viele Karten
+// keinen Preis haben, damit die Anzeige das nicht verschweigt.
+function preisSumme(karten) {
+  let summe = 0;
+  let ohnePreis = 0;
+  for (const karte of karten) {
+    const preis = kartenPreis(karte.id);
+    if (preis === null) {
+      ohnePreis += karte.quantity || 1;
+      continue;
+    }
+    summe += preis * (karte.quantity || 1);
+  }
+  return { summe, ohnePreis };
+}
+
+// Preiszeile unter einer Karte in Suche und Versionsliste. Die Karte
+// bringt ihre Preise selbst mit, dafür ist keine Abfrage nötig.
+function preisSpanne(card) {
+  const preis = preisAusScryfall(card);
+  return preis === null
+    ? `<span class="tile-price is-unknown">${escapeHtml(t("kein Preis"))}</span>`
+    : `<span class="tile-price">${escapeHtml(formatPreis(preis))}</span>`;
+}
+
+function preisText({ summe, ohnePreis }) {
+  return ohnePreis > 0
+    ? t("{price} (+{count} ohne Preis)", { price: formatPreis(summe), count: ohnePreis })
+    : formatPreis(summe);
+}
 
 function ladeCardInfo() {
   let roh;
@@ -2081,13 +2231,18 @@ function ladeCardInfo() {
   }
 
   const grenze = Date.now() - CARD_INFO_TTL;
+  const preisGrenze = Date.now() - PRICE_TTL;
   for (const [id, eintrag] of Object.entries(roh.cards)) {
     if (!eintrag || eintrag.t < grenze) continue;
+    // Alte Preise werden verworfen, die Karte selbst bleibt.
+    const preisFrisch = eintrag.pt > preisGrenze;
     cardInfoCache.set(id, {
       legality: eintrag.legality,
       typeLine: eintrag.typeLine,
       colorIdentity: eintrag.colorIdentity,
       manaCost: eintrag.manaCost,
+      price: preisFrisch ? eintrag.price : null,
+      pt: preisFrisch ? eintrag.pt : 0,
       t: eintrag.t
     });
   }
@@ -2126,7 +2281,12 @@ function speichereCardInfo() {
 ladeCardInfo();
 
 async function ensureLegality(ids) {
-  const fehlende = [...new Set(ids)].filter((id) => id && !cardInfoCache.has(id));
+  await ensureKurs();
+  // Nachgefragt wird für unbekannte Karten und für alle, deren Preis
+  // älter als einen Tag ist. Die übrigen Angaben stehen dann schon.
+  const fehlende = [...new Set(ids)].filter(
+    (id) => id && (!cardInfoCache.has(id) || preisVeraltet(id))
+  );
   if (!fehlende.length) {
     return;
   }
@@ -2151,6 +2311,8 @@ async function ensureLegality(ids) {
         colorIdentity: card.color_identity || [],
         // Bei doppelseitigen Karten steht oben keine Manakosten, nur je Seite.
         manaCost: card.mana_cost || card.card_faces?.[0]?.mana_cost || "",
+        price: preisAusScryfall(card),
+        pt: Date.now(),
         t: Date.now()
       });
     }
@@ -2162,6 +2324,8 @@ async function ensureLegality(ids) {
           typeLine: "",
           colorIdentity: null,
           manaCost: "",
+          price: null,
+          pt: Date.now(),
           t: Date.now()
         });
       }
@@ -2987,7 +3151,10 @@ function renderDeckSearchResults() {
                     : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
                 }
               </span>
-              <span class="tile-caption">${escapeHtml(card.name)}</span>
+              <span class="tile-caption">
+                ${escapeHtml(card.name)}
+                ${preisSpanne(card)}
+              </span>
             </button>
           `;
         })

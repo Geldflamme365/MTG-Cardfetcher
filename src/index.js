@@ -509,7 +509,31 @@ async function handleListDecks(env, user) {
     .bind(user.id)
     .all();
 
-  return json({ decks: (results || []).map((row) => deckFromRow(row, row.card_count)) });
+  // Für den Preis in der Übersicht braucht die Oberfläche die Karten-Ids.
+  // Eine zweite Abfrage für alle Decks zusammen statt einer je Deck.
+  const { results: karten } = await env.DB.prepare(
+    `SELECT c.deck_id, c.card_id, c.quantity
+       FROM deck_cards c
+       JOIN decks d ON d.id = c.deck_id
+      WHERE d.user_id = ?`
+  )
+    .bind(user.id)
+    .all();
+
+  const nachDeck = new Map();
+  for (const zeile of karten || []) {
+    if (!nachDeck.has(zeile.deck_id)) {
+      nachDeck.set(zeile.deck_id, []);
+    }
+    nachDeck.get(zeile.deck_id).push({ id: zeile.card_id, quantity: zeile.quantity });
+  }
+
+  return json({
+    decks: (results || []).map((row) => ({
+      ...deckFromRow(row, row.card_count),
+      cards: nachDeck.get(row.id) || []
+    }))
+  });
 }
 
 async function handleCreateDeck(request, env, user) {
