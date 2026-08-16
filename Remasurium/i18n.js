@@ -177,7 +177,6 @@ const EN = {
   "Feedback gelöscht.": "Feedback deleted.",
 
   // Playtester
-  "▶ Playtest": "▶ Playtest",
   "Karten aus Hand oder Bibliothek hierher ziehen. Klick tappt und enttappt.":
     "Drag cards here from your hand or library. A click taps and untaps.",
   "Bibliothek": "Library",
