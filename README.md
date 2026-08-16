@@ -215,6 +215,17 @@ without editing. While reading a list:
 Export writes the commander first, so an exported deck can be read back in
 unchanged.
 
+### Statistics
+
+Under the deck sits a statistics panel. On top the mana curve: how many cards
+sit at each mana value, 0 through 7 and everything from 8 up in the last bar,
+with the average in the title bar. Lands are left out, since they have no cost
+and would drag the curve down; the commander counts in.
+
+Below it the colour split of the mana costs, one bar per colour with its share.
+It counts coloured mana symbols, so a card costing `{2}{B}{G}` adds one to
+black and one to green, and a hybrid like `{W/U}` adds half to each.
+
 ### Prices
 
 Cards carry a price: under every hit in the search, under every printing in the

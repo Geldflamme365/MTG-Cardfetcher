@@ -176,6 +176,23 @@ const EN = {
   "Feedback löschen": "Delete feedback",
   "Feedback gelöscht.": "Feedback deleted.",
 
+  // Statistik
+  "statistik": "statistics",
+  "Manakurve": "Mana curve",
+  "Farbverteilung der Manakosten": "Colour split of the mana costs",
+  "Ø {avg} bei {count} Karten": "Avg {avg} over {count} cards",
+  "{count} Karten mit Manawert {value}": "{count} cards with mana value {value}",
+  "Das Deck hat keine farbigen Manasymbole.": "The deck has no coloured mana symbols.",
+  "Gezählt werden alle Karten ausser Ländern, der Commander eingerechnet.":
+    "Counted are all cards apart from lands, the commander included.",
+  "Nach farbigen Manasymbolen, Hybride zählen für beide Farben je zur Hälfte.":
+    "By coloured mana symbols; a hybrid counts half for each of its colours.",
+  "Weiss": "White",
+  "Blau": "Blue",
+  "Schwarz": "Black",
+  "Rot": "Red",
+  "Grün": "Green",
+
   // Preise
   "kein Preis": "no price",
   "{price} (+{count} ohne Preis)": "{price} (+{count} without a price)",

@@ -115,6 +115,9 @@ const els = {
   reviewList: document.getElementById("reviewList"),
   toggleSearchBtn: document.getElementById("toggleSearchBtn"),
   legalityBadge: document.getElementById("legalityBadge"),
+  deckStatsSummary: document.getElementById("deckStatsSummary"),
+  manaCurve: document.getElementById("manaCurve"),
+  manaColors: document.getElementById("manaColors"),
   openLandsBtn: document.getElementById("openLandsBtn"),
   landsModal: document.getElementById("landsModal"),
   landsModalCloseBtn: document.getElementById("landsModalCloseBtn"),
@@ -2117,6 +2120,10 @@ const legalityCache = {
 const CARD_INFO_KEY = "remasurium.cardInfo";
 const CARD_INFO_TTL = 30 * 24 * 60 * 60 * 1000;
 const CARD_INFO_MAX = 4000;
+// Hochzählen, sobald ein Feld dazukommt. Sonst behalten alte Einträge ihre
+// frischen Preise, das neue Feld bleibt aber für immer leer, weil nur
+// unbekannte Karten und veraltete Preise nachgefragt werden.
+const CARD_INFO_VERSION = 2;
 // Preise sind das Einzige, was sich täglich ändert. Sie bekommen deshalb
 // eine eigene, kurze Haltbarkeit und einen eigenen Zeitstempel.
 const PRICE_TTL = 24 * 60 * 60 * 1000;
@@ -2226,7 +2233,7 @@ function ladeCardInfo() {
   } catch {
     return;
   }
-  if (!roh || roh.v !== 1 || typeof roh.cards !== "object") {
+  if (!roh || roh.v !== CARD_INFO_VERSION || typeof roh.cards !== "object") {
     return;
   }
 
@@ -2241,6 +2248,7 @@ function ladeCardInfo() {
       typeLine: eintrag.typeLine,
       colorIdentity: eintrag.colorIdentity,
       manaCost: eintrag.manaCost,
+      cmc: eintrag.cmc ?? null,
       price: preisFrisch ? eintrag.price : null,
       pt: preisFrisch ? eintrag.pt : 0,
       t: eintrag.t
@@ -2269,7 +2277,7 @@ function speichereCardInfo() {
       cards[id] = eintrag;
     }
     try {
-      localStorage.setItem(CARD_INFO_KEY, JSON.stringify({ v: 1, cards }));
+      localStorage.setItem(CARD_INFO_KEY, JSON.stringify({ v: CARD_INFO_VERSION, cards }));
     } catch {
       // Voller Speicher: die Ablage fliegt raus, im Arbeitsspeicher bleibt
       // alles erhalten. Beim nächsten Mal wird wieder gefragt.
@@ -2311,6 +2319,7 @@ async function ensureLegality(ids) {
         colorIdentity: card.color_identity || [],
         // Bei doppelseitigen Karten steht oben keine Manakosten, nur je Seite.
         manaCost: card.mana_cost || card.card_faces?.[0]?.mana_cost || "",
+        cmc: typeof card.cmc === "number" ? card.cmc : null,
         price: preisAusScryfall(card),
         pt: Date.now(),
         t: Date.now()
@@ -2447,6 +2456,7 @@ async function checkDeckLegality() {
     // lässt sich eine frisch hinzugefügte Karte richtig einsortieren
     // (vorher stünde sie unter "Sonstige") und rot umranden.
     renderDeckCards();
+    renderDeckStats();
     renderCommanderSlot();
   } catch {
     // Ohne Scryfall bleiben Grösse und Mengen geprüft, verbotene Karten
@@ -2698,6 +2708,92 @@ async function applyLands() {
   }
 }
 
+// --- Statistik ------------------------------------------------------------
+
+// Die Kurve endet bei 8, alles darüber landet im letzten Balken.
+const CURVE_MAX = 8;
+
+function deckStatistik() {
+  const commander = state.activeDeck?.commander;
+  const alle = [
+    ...state.activeDeckCards,
+    ...(commander ? [{ id: commander.id, quantity: 1 }] : [])
+  ];
+
+  const balken = Array.from({ length: CURVE_MAX + 1 }, () => 0);
+  let summe = 0;
+  let anzahl = 0;
+
+  for (const karte of alle) {
+    // Länder haben keine Manakosten und würden die Kurve nach unten ziehen.
+    if (istLand(karte)) {
+      continue;
+    }
+    const wert = cardInfoCache.get(karte.id)?.cmc;
+    if (typeof wert !== "number") {
+      continue;
+    }
+    const stufe = Math.min(Math.max(Math.round(wert), 0), CURVE_MAX);
+    balken[stufe] += karte.quantity;
+    summe += wert * karte.quantity;
+    anzahl += karte.quantity;
+  }
+
+  return { balken, summe, anzahl, schnitt: anzahl ? summe / anzahl : 0, farben: deckPips() };
+}
+
+function renderDeckStats() {
+  if (!state.activeDeck) {
+    return;
+  }
+  const { balken, summe, anzahl, schnitt, farben } = deckStatistik();
+
+  els.deckStatsSummary.textContent = anzahl
+    ? t("Ø {avg} bei {count} Karten", { avg: schnitt.toFixed(2), count: anzahl })
+    : t("{count} Karten", { count: 0 });
+
+  const hoechster = Math.max(...balken, 1);
+  els.manaCurve.innerHTML = balken
+    .map(
+      (wert, stufe) => `
+        <div class="curve-column" title="${escapeHtml(
+          t("{count} Karten mit Manawert {value}", {
+            count: wert,
+            value: stufe === CURVE_MAX ? `${CURVE_MAX}+` : stufe
+          })
+        )}">
+          <span class="curve-count">${wert || ""}</span>
+          <span class="curve-bar" style="height: ${Math.round((wert / hoechster) * 100)}%"></span>
+          <span class="curve-label">${stufe === CURVE_MAX ? `${CURVE_MAX}+` : stufe}</span>
+        </div>
+      `
+    )
+    .join("");
+
+  const gesamtPips = BASIC_LANDS.reduce((wert, eintrag) => wert + farben[eintrag.farbe], 0);
+  if (!gesamtPips) {
+    els.manaColors.innerHTML = `<div class="empty-state">${escapeHtml(
+      t("Das Deck hat keine farbigen Manasymbole.")
+    )}</div>`;
+    return;
+  }
+
+  els.manaColors.innerHTML = BASIC_LANDS.filter((eintrag) => farben[eintrag.farbe] > 0)
+    .map((eintrag) => {
+      const anteil = (farben[eintrag.farbe] / gesamtPips) * 100;
+      return `
+        <div class="color-row">
+          <span class="color-name">${escapeHtml(t(eintrag.label))}</span>
+          <span class="color-track">
+            <span class="color-fill is-${eintrag.farbe.toLowerCase()}" style="width: ${anteil.toFixed(1)}%"></span>
+          </span>
+          <span class="color-share">${Math.round(anteil)}%</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 function renderDeckEditor() {
   if (!state.activeDeck) {
     return;
@@ -2708,6 +2804,7 @@ function renderDeckEditor() {
   checkDeckLegality();
   renderCommanderSlot();
   renderDeckCards();
+  renderDeckStats();
   updateDeckQueries();
 }
 
