@@ -26,6 +26,8 @@ development, so things can change.
 | Path | What it is |
 | --- | --- |
 | `Remasurium/` | The website. It is served as static files. |
+| `Remasurium/regeln.js` | The Magic rules the app needs, as plain functions. No DOM, no network. |
+| `tests/regeln.test.mjs` | Tests for those rules. Run them with `npm test`. |
 | `src/index.js` | The Worker. It handles the API under `/api/*`. |
 | `src/auth.js` | Password hashing and sessions. |
 | `migrations/` | The database schema for D1. |

@@ -1,6 +1,22 @@
 import { api } from "./api.js";
 import { createDeckStore } from "./decks.js";
 import { getLang, setLang, t, watchForNewContent } from "./i18n.js";
+import {
+  BASIC_LANDS,
+  CARD_TYPES,
+  CURVE_MAX,
+  WASTES,
+  farbkuerzel,
+  hatTyp,
+  istStandardlandTyp,
+  landZuFarbe,
+  manaKurve,
+  mischen,
+  passtInFarbidentitaet,
+  typKategorie,
+  verteileNachAnteil,
+  zaehlePips
+} from "./regeln.js";
 
 const state = {
   results: [],
@@ -1809,33 +1825,10 @@ async function applyCommanderVersion(print) {
   });
 }
 
-// Reihenfolge wie in gängigen Deckbau-Seiten. Eine Karte mit mehreren
-// Typen landet beim ersten Treffer dieser Liste: "Artifact Creature"
-// zählt also als Kreatur.
-const CARD_TYPES = [
-  { key: "Creature", label: "Kreaturen" },
-  { key: "Planeswalker", label: "Planeswalker" },
-  { key: "Instant", label: "Spontanzauber" },
-  { key: "Sorcery", label: "Hexereien" },
-  { key: "Artifact", label: "Artefakte" },
-  { key: "Enchantment", label: "Verzauberungen" },
-  { key: "Battle", label: "Schlachten" },
-  { key: "Land", label: "Länder" }
-];
 
-function hatTyp(typeLine, key) {
-  return new RegExp(`\\b${key}\\b`, "i").test(typeLine);
-}
 
 function cardCategory(card) {
-  const typeLine = cardInfoCache.get(card.id)?.typeLine || "";
-  // Ein Land bleibt ein Land, auch wenn die Typzeile noch etwas anderes
-  // nennt: Artefaktländer, Dryad Arbor, Kreaturenländer.
-  if (hatTyp(typeLine, "Land")) {
-    return CARD_TYPES.find((eintrag) => eintrag.key === "Land").label;
-  }
-  const treffer = CARD_TYPES.find((eintrag) => hatTyp(typeLine, eintrag.key));
-  return treffer ? treffer.label : "Sonstige";
+  return typKategorie(cardInfoCache.get(card.id)?.typeLine || "");
 }
 
 function groupCardsByType(cards) {
@@ -2359,12 +2352,6 @@ async function ensureLegality(ids) {
   speichereCardInfo();
 }
 
-// Die Farbidentität wird als WUBRG-Kürzel angezeigt, farblos als C.
-function farbkuerzel(identitaet) {
-  const reihenfolge = ["W", "U", "B", "R", "G"];
-  const sortiert = reihenfolge.filter((farbe) => identitaet.includes(farbe));
-  return sortiert.length ? sortiert.join("") : "C";
-}
 
 function collectDeckProblems() {
   const probleme = [];
@@ -2420,7 +2407,7 @@ function collectDeckProblems() {
   if (rahmen) {
     for (const karte of karten) {
       const eigene = cardInfoCache.get(karte.id)?.colorIdentity;
-      if (!eigene || eigene.every((farbe) => rahmen.includes(farbe))) {
+      if (!eigene || passtInFarbidentitaet(eigene, rahmen)) {
         continue;
       }
       melde(
@@ -2482,42 +2469,15 @@ async function checkDeckLegality() {
 // --- Länder optimieren ---------------------------------------------------
 // Die Standardländer werden nach den farbigen Manasymbolen im Deck verteilt.
 
-const BASIC_LANDS = [
-  { farbe: "W", name: "Plains", label: "Weiss" },
-  { farbe: "U", name: "Island", label: "Blau" },
-  { farbe: "B", name: "Swamp", label: "Schwarz" },
-  { farbe: "R", name: "Mountain", label: "Rot" },
-  { farbe: "G", name: "Forest", label: "Grün" }
-];
 
-// Ein farbloses Deck hat keine der fünf Farben, spielt aber Standardländer.
-const WASTES = { farbe: "C", name: "Wastes", label: "Farblos" };
 
-function landZuFarbe(farbe) {
-  return farbe === WASTES.farbe ? WASTES : BASIC_LANDS.find((eintrag) => eintrag.farbe === farbe);
-}
 
 function istStandardland(karte) {
-  const typ = cardInfoCache.get(karte.id)?.typeLine || "";
-  return /\bBasic\b/i.test(typ) && hatTyp(typ, "Land");
+  return istStandardlandTyp(cardInfoCache.get(karte.id)?.typeLine || "");
 }
 
 function istLand(karte) {
   return hatTyp(cardInfoCache.get(karte.id)?.typeLine || "", "Land");
-}
-
-// Zählt die farbigen Symbole einer Manakosten-Zeichenkette. Hybride teilen
-// sich ihr Gewicht, sonst würde {W/U} für beide Farben voll zählen.
-function zaehlePips(manaCost) {
-  const summe = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-  for (const symbol of manaCost.match(/\{[^}]+\}/g) || []) {
-    const teile = symbol.slice(1, -1).split("/");
-    const farben = teile.filter((teil) => teil in summe);
-    for (const farbe of farben) {
-      summe[farbe] += 1 / farben.length;
-    }
-  }
-  return summe;
 }
 
 function deckPips() {
@@ -2561,30 +2521,6 @@ function landfarben() {
   return liste.length ? liste : [WASTES];
 }
 
-// Grösste Reste: erst abrunden, dann die übrigen Plätze an die grössten
-// Nachkommateile vergeben. So stimmt die Summe immer genau.
-function verteileNachAnteil(gesamt, gewichte) {
-  if (gesamt <= 0 || !gewichte.length) return gewichte.map(() => 0);
-
-  const summe = gewichte.reduce((a, b) => a + b, 0);
-  // Farben ohne ein einziges Symbol im Deck teilen sich gleichmässig auf.
-  const anteile = summe > 0 ? gewichte : gewichte.map(() => 1);
-  const teiler = summe > 0 ? summe : gewichte.length;
-
-  const roh = anteile.map((gewicht) => (gewicht / teiler) * gesamt);
-  const ganz = roh.map(Math.floor);
-  let rest = gesamt - ganz.reduce((a, b) => a + b, 0);
-  const reihenfolge = roh
-    .map((wert, index) => ({ index, rest: wert - Math.floor(wert) }))
-    .sort((a, b) => b.rest - a.rest);
-
-  for (const eintrag of reihenfolge) {
-    if (rest <= 0) break;
-    ganz[eintrag.index] += 1;
-    rest -= 1;
-  }
-  return ganz;
-}
 
 function landZahlen() {
   const karten = state.activeDeckCards;
@@ -2754,15 +2690,6 @@ function playtestStapel() {
   return stuecke;
 }
 
-// Fisher-Yates: jede Reihenfolge gleich wahrscheinlich.
-function mischen(liste) {
-  const kopie = [...liste];
-  for (let i = kopie.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [kopie[i], kopie[j]] = [kopie[j], kopie[i]];
-  }
-  return kopie;
-}
 
 function playtestNeu() {
   const commander = state.activeDeck?.commander;
@@ -2995,8 +2922,6 @@ function closePlaytest() {
 
 // --- Statistik ------------------------------------------------------------
 
-// Die Kurve endet bei 8, alles darüber landet im letzten Balken.
-const CURVE_MAX = 8;
 
 function deckStatistik() {
   const commander = state.activeDeck?.commander;
@@ -3005,26 +2930,13 @@ function deckStatistik() {
     ...(commander ? [{ id: commander.id, quantity: 1 }] : [])
   ];
 
-  const balken = Array.from({ length: CURVE_MAX + 1 }, () => 0);
-  let summe = 0;
-  let anzahl = 0;
+  const fuerKurve = alle.map((karte) => ({
+    manaValue: cardInfoCache.get(karte.id)?.cmc,
+    quantity: karte.quantity,
+    istLand: istLand(karte)
+  }));
 
-  for (const karte of alle) {
-    // Länder haben keine Manakosten und würden die Kurve nach unten ziehen.
-    if (istLand(karte)) {
-      continue;
-    }
-    const wert = cardInfoCache.get(karte.id)?.cmc;
-    if (typeof wert !== "number") {
-      continue;
-    }
-    const stufe = Math.min(Math.max(Math.round(wert), 0), CURVE_MAX);
-    balken[stufe] += karte.quantity;
-    summe += wert * karte.quantity;
-    anzahl += karte.quantity;
-  }
-
-  return { balken, summe, anzahl, schnitt: anzahl ? summe / anzahl : 0, farben: deckPips() };
+  return { ...manaKurve(fuerKurve), farben: deckPips() };
 }
 
 function renderDeckStats() {
