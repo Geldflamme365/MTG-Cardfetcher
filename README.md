@@ -100,12 +100,21 @@ sends it automatically, so you do not have to handle it yourself.
 ## About security
 
 - Passwords are hashed with PBKDF2-SHA256. Every account has its own salt.
-- The number of rounds is 50,000. You find it in `src/auth.js`. The reason for
-  this number: the Cloudflare free plan gives a Worker only 10 ms of CPU time
-  per request, and 50,000 rounds take about 6.5 ms. The OWASP number of
-  210,000 would take about 26 ms and would break the limit. Each account
-  stores the number of rounds it was created with, so you can raise the
-  constant later on a paid plan and old logins still work.
+- The number of rounds is 50,000. You find it in `src/auth.js`. The Cloudflare
+  free plan gives a Worker 10 ms of CPU time per invocation. Waiting for the
+  database does not count against that; hashing does, which makes it the most
+  expensive thing this Worker performs. The OWASP number of 210,000 costs
+  roughly four times as much — measured on a laptop, 70 ms against 17 ms. The
+  ratio is what carries over; the absolute numbers depend on the hardware, and
+  Cloudflare's is faster than a laptop. That 50,000 fits is what the running
+  site proves.
+- 50,000 is a round number with room to spare, not a tuned one. Exceeding the
+  limit does not make a login slow, it kills the request, and hashing is only
+  part of what the request has to do. Creeping closer to the ceiling would buy
+  about one bit against an attacker and risk failed logins under load.
+- Each account stores the number of rounds it was created with. Login hashes
+  with the account's own number, not the current constant, so the constant can
+  be raised later on a paid plan and old logins still work.
 - The database only stores a SHA-256 hash of the session token. Someone who
   reads the database cannot take over a session with it.
 - Login also hashes a password when the email does not exist. Otherwise the
