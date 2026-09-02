@@ -1,10 +1,13 @@
 // Passwort-Hashing und Session-Handling.
 //
-// Cloudflare erlaubt auf dem Free-Plan 10 ms CPU pro Request. PBKDF2 mit
-// 50'000 Iterationen braucht rund 6.5 ms und laesst damit noch Luft fuer
-// die D1-Abfrage. Wer auf den Paid-Plan wechselt, kann die Konstante
-// hochziehen (OWASP empfiehlt 210'000) - alte Hashes bleiben gueltig,
-// weil die verwendete Iterationszahl pro User gespeichert wird.
+// Cloudflare erlaubt auf dem Free-Plan 10 ms CPU pro Aufruf. Gezaehlt
+// wird nur gerechnete Zeit, Warten auf D1 nicht - Hashing ist damit das
+// Teuerste, was dieser Worker tut. 50'000 ist eine runde Zahl mit
+// Abstand zur Grenze, keine ausgereizte: Ein Ueberschreiten macht den
+// Login nicht langsam, sondern bricht ihn ab. Die von OWASP empfohlenen
+// 210'000 kosten rund das Vierfache. Wer auf den Paid-Plan wechselt,
+// kann die Konstante hochziehen - alte Hashes bleiben gueltig, weil die
+// verwendete Iterationszahl pro User gespeichert wird.
 export const PBKDF2_ITERATIONS = 50_000;
 
 const SESSION_TTL_DAYS = 30;
