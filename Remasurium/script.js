@@ -182,13 +182,18 @@ const els = {
   collectionScopeNote: document.getElementById("collectionScopeNote")
 };
 
-function setStatus(text, type = "muted") {
-  if (!els.status) {
+// Alle Statuszeilen sehen gleich aus: Text setzen, Klasse setzen. Fehlt
+// das Element, passiert nichts.
+function schreibeStatus(element, text, type = "muted") {
+  if (!element) {
     return;
   }
+  element.textContent = text;
+  element.className = `status ${type}`;
+}
 
-  els.status.textContent = text;
-  els.status.className = `status ${type}`;
+function setStatus(text, type = "muted") {
+  schreibeStatus(els.status, text, type);
 }
 
 function escapeHtml(value) {
@@ -229,24 +234,12 @@ function entryFromCard(card, addedAt = null) {
   };
 }
 
+// Alles, was keine bekannte Route ist, landet auf der Startseite.
+const ROUTEN = new Set(["suche", "collection", "decks", "account"]);
+
 function normalizeRoute(hash) {
   const route = hash.replace(/^#\/?/, "").trim().toLowerCase();
-  if (!route) {
-    return "home";
-  }
-  if (route === "suche") {
-    return "suche";
-  }
-  if (route === "collection") {
-    return "collection";
-  }
-  if (route === "decks") {
-    return "decks";
-  }
-  if (route === "account") {
-    return "account";
-  }
-  return "home";
+  return ROUTEN.has(route) ? route : "home";
 }
 
 function setActiveNav(route) {
@@ -738,6 +731,32 @@ async function gotoSearchPage(seite) {
   );
 }
 
+// Kachel fuer die Suchergebnisse. Beide Suchen zeigen dasselbe, nur der
+// Knopf traegt ein anderes Datenattribut.
+function suchKachel(card, { attribut, titel, aktiv = false }) {
+  const preview = getCardPreviewUrl(card);
+  return `
+    <button
+      type="button"
+      class="search-tile${aktiv ? " active" : ""}"
+      ${attribut}="${escapeHtml(card.id)}"
+      title="${escapeHtml(titel)}"
+    >
+      <span class="tile-frame">
+        ${
+          preview
+            ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+            : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
+        }
+      </span>
+      <span class="tile-caption">
+        ${escapeHtml(card.name)}
+        ${preisSpanne(card)}
+      </span>
+    </button>
+  `;
+}
+
 function renderResults() {
   updateResultCount();
 
@@ -753,29 +772,13 @@ function renderResults() {
   els.results.innerHTML = `
     <div class="search-grid">
       ${aufDerSeite
-        .map((card) => {
-          const preview = getCardPreviewUrl(card);
-          return `
-            <button
-              type="button"
-              class="search-tile${state.searchSelection?.id === card.id ? " active" : ""}"
-              data-select="${card.id}"
-              title="${escapeHtml(card.name)}"
-            >
-              <span class="tile-frame">
-                ${
-                  preview
-                    ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
-                    : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
-                }
-              </span>
-              <span class="tile-caption">
-                ${escapeHtml(card.name)}
-                ${preisSpanne(card)}
-              </span>
-            </button>
-          `;
-        })
+        .map((card) =>
+          suchKachel(card, {
+            attribut: "data-select",
+            titel: card.name,
+            aktiv: state.searchSelection?.id === card.id
+          })
+        )
         .join("")}
     </div>
     ${pagerMarkup(state.searchPage, seiten)}
@@ -1454,11 +1457,7 @@ if (els.collectionModal) {
 }
 
 function setDeckStatus(text, type = "muted") {
-  if (!els.deckStatus) {
-    return;
-  }
-  els.deckStatus.textContent = text;
-  els.deckStatus.className = `status ${type}`;
+  schreibeStatus(els.deckStatus, text, type);
 }
 
 // Karten, von denen ein Deck beliebig viele haben darf. Das sind
@@ -2673,8 +2672,7 @@ function openLandsModal() {
 }
 
 function setLandsStatus(text, art = "muted") {
-  els.landsStatus.textContent = text;
-  els.landsStatus.className = `status ${art}`;
+  schreibeStatus(els.landsStatus, text, art);
 }
 
 async function applyLands() {
@@ -3543,24 +3541,9 @@ function renderDeckSearchResults() {
     <div class="search-grid">
       ${results
         .slice(start, start + SEARCH_PAGE_SIZE)
-        .map((card) => {
-          const preview = getCardPreviewUrl(card);
-          return `
-            <button type="button" class="search-tile" data-add="${escapeHtml(card.id)}" title="Details zu ${escapeHtml(card.name)}">
-              <span class="tile-frame">
-                ${
-                  preview
-                    ? `<img src="${escapeHtml(preview)}" alt="${escapeHtml(card.name)}" loading="lazy" />`
-                    : `<span class="search-fallback">${escapeHtml(card.name)}</span>`
-                }
-              </span>
-              <span class="tile-caption">
-                ${escapeHtml(card.name)}
-                ${preisSpanne(card)}
-              </span>
-            </button>
-          `;
-        })
+        .map((card) =>
+          suchKachel(card, { attribut: "data-add", titel: `Details zu ${card.name}` })
+        )
         .join("")}
     </div>
     ${pagerMarkup(state.deckSearchPage, seiten)}
@@ -3632,8 +3615,7 @@ async function quickAdd() {
 }
 
 function setFeedbackStatus(text, type = "muted") {
-  els.feedbackStatus.textContent = text;
-  els.feedbackStatus.className = `status ${type}`;
+  schreibeStatus(els.feedbackStatus, text, type);
 }
 
 function renderReviews(reviews) {
@@ -3721,11 +3703,7 @@ async function submitFeedback(event) {
 }
 
 function setAuthStatus(text, type = "muted") {
-  if (!els.authStatus) {
-    return;
-  }
-  els.authStatus.textContent = text;
-  els.authStatus.className = `status ${type}`;
+  schreibeStatus(els.authStatus, text, type);
 }
 
 function showAuthTab(name) {

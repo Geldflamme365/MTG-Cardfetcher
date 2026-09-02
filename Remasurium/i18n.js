@@ -34,9 +34,7 @@ const EN = {
 
   // Suche
   "Suchen": "Search",
-  "Status": "Status",
   "Bereit. Gib einen Suchbegriff ein.": "Ready. Type something to search for.",
-  "Tip": "Tip",
   "Normale Namen werden tolerant gesucht. Wenn du Scryfall-Syntax nutzt, bleibt die Suche exakt.":
     "Plain names are matched loosely. Use Scryfall syntax and the search stays exact.",
   "z.B. commodore guff": "e.g. commodore guff",
@@ -67,7 +65,6 @@ const EN = {
   "Aus dem Deck entfernen": "Take out of the deck",
 
   // Collection
-  "cards saved locally in your browser": "cards saved locally in your browser",
   "Karten in deiner Cloud-Collection": "cards in your cloud collection",
   "Gespeicherte Karten bleiben nur in diesem Browser. Melde dich an, um sie in der Cloud zu sichern.":
     "Saved cards stay in this browser only. Sign in to keep them in the cloud.",
@@ -79,7 +76,6 @@ const EN = {
   // Decks
   "Neues Deck": "New deck",
   "Erstellen": "Create",
-  "Format": "Format",
   "Bisher gibt es nur Commander: eine Karte je Exemplar, ausser bei Standardländern und Karten wie Relentless Rats. An den übrigen Formaten wird noch gearbeitet.":
     "Only Commander so far: one copy of each card, except basic lands and cards like Relentless Rats. The other formats are still being worked on.",
   "Deck importieren": "Import a deck",
@@ -94,7 +90,6 @@ const EN = {
   "Deck löschen": "Delete deck",
   "Deckname": "Deck name",
   "Speichern": "Save",
-  "Commander": "Commander",
   "Noch keiner gewählt": "None picked yet",
   "Sein Bild steht in der Übersicht für dieses Deck.":
     "Its artwork stands for this deck in the overview.",
@@ -117,7 +112,6 @@ const EN = {
   "Entfernen": "Remove",
   "Deck umbenennen": "Rename deck",
   "Kartenliste": "Card list",
-  "Name (optional)": "Name (optional)",
   "Als neues Deck importieren": "Import as a new deck",
   "Kopieren": "Copy",
   "Eine Karte pro Zeile, davor die Anzahl. Set-Angaben in Klammern und Kommentarzeilen werden überlesen. Die erste Karte, die Commander sein darf, wird dazu. Danach öffnet sich das Deck, wo du den Namen jederzeit ändern kannst.":
@@ -180,7 +174,6 @@ const EN = {
   "Karten aus Hand oder Bibliothek hierher ziehen. Klick tappt und enttappt.":
     "Drag cards here from your hand or library. A click taps and untaps.",
   "Bibliothek": "Library",
-  "Commander": "Commander",
   "keiner": "none",
   "leer": "empty",
   "Klick zieht, Ziehen legt direkt ins Spiel":
@@ -189,7 +182,6 @@ const EN = {
   "Neuer Zug (N)": "New turn (N)",
   "Neues Spiel (Shift+N)": "New game (Shift+N)",
   "Zug": "Turn",
-  "Hand": "Hand",
   "Im Spiel": "In play",
   "Neues Spiel, {count} Karten auf der Hand.": "New game, {count} cards in hand.",
   "{count} Karte gezogen.": "Drew {count} card(s).",
@@ -254,7 +246,6 @@ const EN = {
     "The split follows the coloured mana symbols in the deck. A symbol like {W/U} counts half for each of its colours. The numbers can be overwritten by hand; what is in the fields is what gets set.",
 
   // Regelprüfung
-  "legal": "legal",
   "nicht legal": "not legal",
   "wird geprüft": "checking",
   "Regelprüfung anzeigen": "Show the rules check",
@@ -275,8 +266,6 @@ const EN = {
     "{name} does not fit the commander's colour identity {colors}.",
   "Geprüft werden die Deckgrösse von genau 100 Karten inklusive Commander, ein Exemplar je Karte ausser bei Standardländern und Relentless-Karten, im Commander verbotene Karten sowie die Farbidentität des Commanders. Karten, an denen etwas hängt, sind im Deck rot umrandet.":
     "Checked are the deck size of exactly 100 cards including the commander, one copy of each card apart from basic lands and Relentless cards, cards banned in Commander, and the commander's colour identity. Cards that cause a problem get a red border in the deck.",
-  "Kreaturen": "Creatures",
-  "Spells": "Spells",
   "Kartenziehen": "Card draw",
   "Länder": "Lands",
   "farblos": "colourless",
@@ -288,7 +277,6 @@ const EN = {
   "E-Mail": "Email",
   "Passwort": "Password",
   "Anzeigename": "Display name",
-  "optional": "optional",
   "Mindestens 8 Zeichen.": "At least 8 characters.",
   "Passwort zurücksetzen": "Reset password",
   "Wiederherstellungscode": "Recovery code",
